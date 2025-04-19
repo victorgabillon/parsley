@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=78.1.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parlsey"
+version = "0.1.0"
+description = "A parser combining dacite and argparse"
+authors = [
+    { name="Victor Gabillon", email="victorgabillon@gmail.com" }
+]
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "PyYAML>=6.0.2"
+    "dacite>=1.9.2"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/your-package"
+
+[tool.setuptools]
+package-dir = {"" = "parsley"}
