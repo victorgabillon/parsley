@@ -1,11 +1,12 @@
-
 from dataclasses import dataclass
 from parsley_coco.recursive_dataclass_with_path_to_yaml import resolve_yaml_to_base
+
 
 @dataclass
 class C:
     x: int
     y: str
+
 
 @dataclass
 class A:
@@ -13,30 +14,29 @@ class A:
     roo: C
 
 
-
 @dataclass
 class HOP:
-    i:int
+    i: int
     b: C
 
 
 @dataclass
 class BIM:
-    i:int
+    i: int
     hop: HOP
+
 
 @dataclass
 class C:
     x: int
     y: str
 
+
 @dataclass
 class A2:
     a: int
     roo: C
     bim: BIM
-
-
 
 
 def test_resolve_dataclass_from_yaml():
@@ -49,6 +49,6 @@ def test_resolve_dataclass_from_yaml_2():
     print(final_result)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     test_resolve_dataclass_from_yaml()
     test_resolve_dataclass_from_yaml_2()

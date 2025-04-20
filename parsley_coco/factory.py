@@ -26,15 +26,16 @@ Example usage:
 
 import argparse
 from dataclasses import Field, fields
-from typing import Any
+from typing import Any, Type
 
 from parsley_coco.parser import Parsley
+from parsley_coco.utils import IsDataclass
 
 
-def create_parsley(
-    args_dataclass_name: Any,  # type[DataclassInstance]
+def create_parsley[T_Dataclass: IsDataclass](
+    args_dataclass_name: Type[T_Dataclass],
     should_parse_command_line_arguments: bool = True,
-) -> Parsley:
+) -> Parsley[T_Dataclass]:
     """
     Create an argument parser for command line arguments.
 
@@ -65,7 +66,7 @@ def create_parsley(
             str("--" + field.name), type=str, default=None, help="to be written"
         )
 
-    my_parser: Parsley = Parsley(
+    my_parser: Parsley[T_Dataclass] = Parsley(
         parser=parser,
         args_dataclass_name=args_dataclass_name,
         should_parse_command_line_arguments=should_parse_command_line_arguments,

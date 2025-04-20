@@ -9,7 +9,7 @@ Classes:
 
 import os
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Type
 from enum import Enum
 import yaml
 import dacite
@@ -17,7 +17,7 @@ import dacite
 from parsley_coco.utils import unflatten, IsDataclass
 
 
-class Parsley:
+class Parsley[T_Dataclass: IsDataclass]:
     """
     A class for parsing command line arguments and config file arguments.
 
@@ -46,12 +46,12 @@ class Parsley:
     args_config_file: dict[str, Any] | None
     merged_args: dict[str, Any] | None
     should_parse_command_line_arguments: bool = True
-    args_dataclass_name: Any  # type[DataclassInstance]
+    args_dataclass_name: Type[T_Dataclass]
 
     def __init__(
         self,
         parser: Any,
-        args_dataclass_name: Any,  # type[DataclassInstance]
+        args_dataclass_name: Type[T_Dataclass],
         should_parse_command_line_arguments: bool = True,
     ) -> None:
         """
@@ -114,7 +114,7 @@ class Parsley:
             raise Exception("Could not read file:", config_file_path)
         self.args_config_file = args_config_file
 
-    def parse_arguments[T_Dataclass: IsDataclass](
+    def parse_arguments(
         self,
         extra_args: dict[str, Any] | None = None,
     ) -> T_Dataclass:
@@ -168,10 +168,9 @@ class Parsley:
         # Converting the args in the standardized dataclass
         dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
-            data=self.merged_args   ,
+            data=self.merged_args,
             config=dacite.Config(cast=[Enum]),
         )
-
 
         return dataclass_args
 

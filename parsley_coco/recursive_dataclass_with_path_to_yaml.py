@@ -1,21 +1,15 @@
+from dataclasses import fields, Field, make_dataclass, is_dataclass
+from typing import Optional, List, Tuple, Any, Type, get_type_hints
+
 import yaml
-from dataclasses import is_dataclass, fields
-from typing import Type, Any, Optional
 from dacite import from_dict
-import os
+from dacite.types import is_instance
 
 
-from dataclasses import make_dataclass
-from typing import Union, get_type_hints, Type, Optional
-
-from dataclasses import dataclass, fields, Field, make_dataclass, is_dataclass
-from typing import Optional, List, Tuple, Any, Type, get_type_hints, Union
-
-
-def make_dataclass_with_optional_paths_ii(cls: Type) -> Type:
+def make_dataclass_with_optional_paths_ii(cls: Type[Any]) -> Type[Any]:
     assert is_dataclass(cls), f"{cls} must be a dataclass"
 
-    new_fields: List[Tuple[str, Any, Field]] = []
+    new_fields: List[Tuple[str, Any, Field[Any]]] = []
     hints = get_type_hints(cls)
 
     for field in fields(cls):
@@ -24,11 +18,7 @@ def make_dataclass_with_optional_paths_ii(cls: Type) -> Type:
         # Always add the original field (make optional if it's a dataclass)
         if is_dataclass(field_type):
             new_fields.append((field.name, Optional[field_type], field))
-            new_fields.append((
-                f"{field.name}_path_to_yaml_file",
-                Optional[str],
-                field
-            ))
+            new_fields.append((f"{field.name}_path_to_yaml_file", Optional[str], field))
         else:
             new_fields.append((field.name, field_type, field))
 
@@ -36,7 +26,7 @@ def make_dataclass_with_optional_paths_ii(cls: Type) -> Type:
     return make_dataclass(new_cls_name, new_fields)
 
 
-def make_dataclass_with_optional_paths(cls: Type) -> Type:
+def make_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
     assert is_dataclass(cls), f"{cls} must be a dataclass"
 
     new_fields: List[Tuple[str, Any]] = []
@@ -56,9 +46,7 @@ def make_dataclass_with_optional_paths(cls: Type) -> Type:
     return make_dataclass(new_cls_name, new_fields)
 
 
-def resolve_yaml_to_base(yaml_path: str, base_cls: Type) -> Any:
-
-
+def resolve_yaml_to_base(yaml_path: str, base_cls: Type[Any]) -> Any:
     extended_cls = make_dataclass_with_optional_paths(base_cls)
 
     with open(yaml_path, "r") as f:
@@ -69,9 +57,8 @@ def resolve_yaml_to_base(yaml_path: str, base_cls: Type) -> Any:
     return resolve_extended_object(extended_obj, base_cls)
 
 
-def resolve_extended_object(extended_obj: Any, base_cls: Type) -> Any:
+def resolve_extended_object(extended_obj: Any, base_cls: Type[Any]) -> Any:
     resolved_data = {}
-
 
     for field in fields(base_cls):
         base_field_type = field.type
@@ -81,8 +68,10 @@ def resolve_extended_object(extended_obj: Any, base_cls: Type) -> Any:
             path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", None)
 
             if path_val and not val:
+                assert isinstance(base_field_type, type)
                 resolved_val = resolve_yaml_to_base(path_val, base_field_type)
             elif val:
+                assert isinstance(base_field_type, type)
                 resolved_val = resolve_extended_object(val, base_field_type)
             else:
                 resolved_val = None  # or raise, depending on strictness
@@ -90,6 +79,5 @@ def resolve_extended_object(extended_obj: Any, base_cls: Type) -> Any:
             resolved_data[field.name] = resolved_val
         else:
             resolved_data[field.name] = val
-
 
     return from_dict(data_class=base_cls, data=resolved_data)
