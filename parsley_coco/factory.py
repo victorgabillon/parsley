@@ -28,11 +28,11 @@ import argparse
 from dataclasses import Field, fields
 from typing import Any
 
-from parlsey.parser import Parsley
+from parsley_coco.parser import Parsley
 
 
 def create_parsley(
-    args_class_name: Any,  # type[DataclassInstance]
+    args_dataclass_name: Any,  # type[DataclassInstance]
     should_parse_command_line_arguments: bool = True,
 ) -> Parsley:
     """
@@ -60,14 +60,14 @@ def create_parsley(
     # one can  specify parameters from the class named args_class_name
     # that will overwrite the ones in the yaml file
     field: Field[Any]
-    for field in fields(args_class_name):
+    for field in fields(args_dataclass_name):
         parser.add_argument(
             str("--" + field.name), type=str, default=None, help="to be written"
         )
 
     my_parser: Parsley = Parsley(
         parser=parser,
-        args_class_name=args_class_name,
+        args_dataclass_name=args_dataclass_name,
         should_parse_command_line_arguments=should_parse_command_line_arguments,
     )
 

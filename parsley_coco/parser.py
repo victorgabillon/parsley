@@ -14,7 +14,7 @@ from enum import Enum
 import yaml
 import dacite
 
-from parlsey.utils import unflatten, IsDataclass
+from parsley_coco.utils import unflatten, IsDataclass
 
 
 class Parsley:

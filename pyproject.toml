@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=78.1.1"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "parlsey"
-version = "0.1.0"
+name = "parsley_coco"
+version = "0.1.4"
 description = "A parser combining dacite and argparse"
 authors = [
     { name="Victor Gabillon", email="victorgabillon@gmail.com" }
@@ -13,12 +13,23 @@ readme = "README.md"
 license = { file="LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
-    "PyYAML>=6.0.2"
+    "PyYAML>=6.0.2",
     "dacite>=1.9.2"
 ]
 
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+
 [project.urls]
-"Homepage" = "https://github.com/yourusername/your-package"
+"Homepage" = "https://github.com/victorgabillon/parsley"
 
 [tool.setuptools]
-package-dir = {"" = "parsley"}
+#package-dir = {"" = "parsley_coco"}
+
+[tool.pytest.ini_options]
+testpaths = [
+    "parsley_coco",
+    "tests"
+]
