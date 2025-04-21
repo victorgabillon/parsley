@@ -14,6 +14,7 @@ from enum import Enum
 import yaml
 import dacite
 
+from parsley_coco.recursive_dataclass_with_path_to_yaml import resolve_yaml_to_base
 from parsley_coco.utils import unflatten, IsDataclass
 
 
@@ -98,12 +99,15 @@ class Parsley[T_Dataclass: IsDataclass]:
             config_file_path (str): The path to the config file.
         """
         try:
-            with open(config_file_path, "r") as exp_options_file:
+            with open(config_file_path, "r") as _:
                 try:
-                    args_config_file = yaml.safe_load(exp_options_file)
-                    args_config_file = (
-                        {} if args_config_file is None else args_config_file
+                    # read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
+                    dataclass_from_conf_file: T_Dataclass = resolve_yaml_to_base(
+                        yaml_path=config_file_path, base_cls=self.args_dataclass_name
                     )
+
+                    # transforming back to dictionary to ease the potential future merges
+                    args_config_file: dict[str, Any] = asdict(dataclass_from_conf_file)
                     print(
                         "Here are the yaml file arguments of the script",
                         args_config_file,
