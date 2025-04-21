@@ -23,3 +23,12 @@ class IsDataclass(Protocol):
     """
 
     __dataclass_fields__: ClassVar[dict[Any, Any]]
+
+
+def remove_none(d: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(d, dict):
+        return {k: remove_none(v) for k, v in d.items() if v is not None}
+    elif isinstance(d, list):
+        return [remove_none(item) for item in d]
+    else:
+        return d

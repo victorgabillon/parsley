@@ -1,53 +1,18 @@
-from dataclasses import fields, Field, make_dataclass, is_dataclass
-from typing import Optional, List, Tuple, Any, Type, get_type_hints
-
-from dacite import from_dict
+from dataclasses import fields, is_dataclass, asdict
 from enum import Enum
-import yaml
+from typing import Any, Type
+
 import dacite
+import yaml
+from dacite import from_dict
+
+from parsley_coco.alternative_dataclasses import make_dataclass_with_optional_paths
+from parsley_coco.utils import IsDataclass
 
 
-def make_dataclass_with_optional_paths_ii(cls: Type[Any]) -> Type[Any]:
-    assert is_dataclass(cls), f"{cls} must be a dataclass"
-
-    new_fields: List[Tuple[str, Any, Field[Any]]] = []
-    hints = get_type_hints(cls)
-
-    for field in fields(cls):
-        field_type = hints[field.name]
-
-        # Always add the original field (make optional if it's a dataclass)
-        if is_dataclass(field_type):
-            new_fields.append((field.name, Optional[field_type], field))
-            new_fields.append((f"{field.name}_path_to_yaml_file", Optional[str], field))
-        else:
-            new_fields.append((field.name, field_type, field))
-
-    new_cls_name = cls.__name__ + "_with_potential_path"
-    return make_dataclass(new_cls_name, new_fields)
-
-
-def make_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
-    assert is_dataclass(cls), f"{cls} must be a dataclass"
-
-    new_fields: List[Tuple[str, Any]] = []
-    hints = get_type_hints(cls)
-
-    for f in fields(cls):
-        field_type = hints[f.name]
-
-        # If it's a dataclass, add both the field and its '_path_to_yaml_file' sibling
-        if is_dataclass(field_type):
-            new_fields.append((f.name, Optional[field_type]))
-            new_fields.append((f"{f.name}_path_to_yaml_file", Optional[str]))
-        else:
-            new_fields.append((f.name, field_type))
-
-    new_cls_name = cls.__name__ + "_with_potential_path"
-    return make_dataclass(new_cls_name, new_fields)
-
-
-def resolve_yaml_to_base(yaml_path: str, base_cls: Type[Any]) -> Any:
+def resolve_yaml_to_base[T_Dataclass: IsDataclass](
+    yaml_path: str, base_cls: Type[T_Dataclass]
+) -> T_Dataclass:
     extended_cls = make_dataclass_with_optional_paths(base_cls)
 
     try:
@@ -63,7 +28,9 @@ def resolve_yaml_to_base(yaml_path: str, base_cls: Type[Any]) -> Any:
     return resolve_extended_object(extended_obj, base_cls)
 
 
-def resolve_extended_object(extended_obj: Any, base_cls: Type[Any]) -> Any:
+def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
+    extended_obj: Any, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+) -> dict[str, Any]:
     resolved_data = {}
 
     for field in fields(base_cls):
@@ -75,19 +42,35 @@ def resolve_extended_object(extended_obj: Any, base_cls: Type[Any]) -> Any:
 
             if path_val and not val:
                 assert isinstance(base_field_type, type)
-                resolved_val = resolve_yaml_to_base(path_val, base_field_type)
+                resolved_val = asdict(resolve_yaml_to_base(path_val, base_field_type))
             elif val and not path_val:
                 assert isinstance(base_field_type, type)
-                resolved_val = resolve_extended_object(val, base_field_type)
+                resolved_val = resolve_extended_object_to_dict(val, base_field_type)
             else:
-                raise ValueError(
-                    f"Exactly one of the fields {field.name} or {field.name}_path_to_yaml_file must be given, not none of them, not both"
-                )
+                if raise_error_with_nones:
+                    string = f"Exactly one of the fields {field.name} or {field.name}_path_to_yaml_file must be given, "
+                    if not val and not path_val:
+                        string += "not none of them"
+                    elif val is not None and path_val is not None:
+                        string += "not both"
+                    raise ValueError(string)
+                else:
+                    resolved_val = None
 
             resolved_data[field.name] = resolved_val
 
         else:
             resolved_data[field.name] = val
+
+    return resolved_data
+
+
+def resolve_extended_object[T_Dataclass: IsDataclass](
+    extended_obj: Any, base_cls: Type[T_Dataclass]
+) -> T_Dataclass:
+    resolved_data: dict[str, Any] = resolve_extended_object_to_dict(
+        extended_obj=extended_obj, base_cls=base_cls
+    )
 
     return from_dict(
         data_class=base_cls, data=resolved_data, config=dacite.Config(cast=[Enum])

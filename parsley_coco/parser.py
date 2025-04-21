@@ -14,8 +14,12 @@ from enum import Enum
 import yaml
 import dacite
 
-from parsley_coco.recursive_dataclass_with_path_to_yaml import resolve_yaml_to_base
-from parsley_coco.utils import unflatten, IsDataclass
+from parsley_coco.recursive_dataclass_with_path_to_yaml import (
+    resolve_yaml_to_base,
+    resolve_extended_object,
+    resolve_extended_object_to_dict,
+)
+from parsley_coco.utils import unflatten, IsDataclass, remove_none
 
 
 class Parsley[T_Dataclass: IsDataclass]:
@@ -120,7 +124,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
     def parse_arguments(
         self,
-        extra_args: dict[str, Any] | None = None,
+        extra_args: IsDataclass | None = None,
     ) -> T_Dataclass:
         """
         Parse the command line arguments, config file arguments, and extra arguments.
@@ -132,9 +136,16 @@ class Parsley[T_Dataclass: IsDataclass]:
         Returns:
             dict[str, Any]: A dictionary containing the merged arguments.
         """
+        extra_args_dict: dict[str, Any]
         if extra_args is None:
-            extra_args = {}
-        assert extra_args is not None
+            extra_args_dict = {}
+        else:
+            extra_args_dict = resolve_extended_object_to_dict(
+                extended_obj=extra_args,
+                base_cls=self.args_dataclass_name,
+                raise_error_with_nones=False,
+            )
+            extra_args_dict = remove_none(d=extra_args_dict)
 
         if self.should_parse_command_line_arguments:
             self.args_command_line = self.parse_command_line_arguments()
@@ -143,7 +154,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
-        first_merged_args = self.args_command_line | extra_args
+        first_merged_args = self.args_command_line | extra_args_dict
 
         # 'config_file_name' is a specific input that can be specified either in extra_args or in the command line
         # and that gives the path to a yaml file containing more args
