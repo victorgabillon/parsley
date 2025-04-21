@@ -123,8 +123,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         self.args_config_file = args_config_file
 
     def parse_arguments(
-        self,
-        extra_args: IsDataclass | None = None,
+        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
     ) -> T_Dataclass:
         """
         Parse the command line arguments, config file arguments, and extra arguments.
@@ -158,8 +157,8 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         # 'config_file_name' is a specific input that can be specified either in extra_args or in the command line
         # and that gives the path to a yaml file containing more args
-        config_file_path = None
-        if "config_file_name" in first_merged_args:
+
+        if config_file_path is None and "config_file_name" in first_merged_args:
             config_file_path = first_merged_args["config_file_name"]
         if config_file_path is None:
             try:

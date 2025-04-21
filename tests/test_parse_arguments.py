@@ -44,11 +44,11 @@ def test_parse_arguments():
     pars: Parsley[A2] = create_parsley(
         args_dataclass_name=A2, should_parse_command_line_arguments=False
     )
-    a2 = pars.parse_arguments(extra_args={})
+    a2 = pars.parse_arguments(extra_args=None)
     print(a2)
 
     a2 = pars.parse_arguments(
-        extra_args={"config_file_name": "tests/yaml_files/test_a2.yaml"}
+        config_file_path= "tests/yaml_files/test_a2.yaml"
     )
     print(a2)
 

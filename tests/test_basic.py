@@ -4,12 +4,12 @@ from dataclasses import dataclass
 
 
 @dataclass
-class TestDataClass:
+class TesDataClass:
     first_attribute: int = 0
 
 
 def test_creation():
     parsley = create_parsley(
-        should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass
+        should_parse_command_line_arguments=False, args_dataclass_name=TesDataClass
     )
-    parsley.parse_arguments(extra_args={})
+    parsley.parse_arguments(extra_args=None)

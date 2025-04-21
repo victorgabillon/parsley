@@ -29,10 +29,13 @@ def resolve_yaml_to_base[T_Dataclass: IsDataclass](
 
 
 def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
-    extended_obj: Any, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+    extended_obj: IsDataclass,
+    base_cls: Type[T_Dataclass],
+    raise_error_with_nones: bool = True,
 ) -> dict[str, Any]:
     resolved_data = {}
 
+    assert is_dataclass(extended_obj)
     for field in fields(base_cls):
         base_field_type = field.type
         val = getattr(extended_obj, field.name, None)
