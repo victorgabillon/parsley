@@ -1,4 +1,7 @@
-from typing import Any, ClassVar, Protocol
+from dataclasses import is_dataclass
+from typing import Any
+from typing import ClassVar, Protocol
+from typing import Union, get_origin, get_args
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
@@ -32,3 +35,12 @@ def remove_none(d: dict[str, Any]) -> dict[str, Any]:
         return [remove_none(item) for item in d]
     else:
         return d
+
+
+def is_or_contains_dataclass(t: type) -> bool:
+    """Check if a type is a dataclass or a Union including a dataclass."""
+    if is_dataclass(t):
+        return True
+    if get_origin(t) is Union:
+        return any(is_dataclass(arg) for arg in get_args(t))
+    return False

@@ -2,10 +2,12 @@ from dataclasses import fields, make_dataclass, is_dataclass
 from typing import List, Tuple
 from typing import Optional, get_type_hints, Dict, Type, Any
 
+from parsley_coco.utils import is_or_contains_dataclass
+
 _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
 
-def make_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
+def make_dataclass_with_optional_paths_and_overwrite(cls: Type[Any]) -> Type[Any]:
     assert is_dataclass(cls), f"{cls} must be a dataclass"
 
     new_fields: List[Tuple[str, Any]] = []
@@ -15,9 +17,11 @@ def make_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
         field_type = hints[f.name]
 
         # If it's a dataclass, add both the field and its '_path_to_yaml_file' sibling
-        if is_dataclass(field_type):
+        if is_or_contains_dataclass(field_type):
             new_fields.append((f.name, Optional[field_type]))
             new_fields.append((f"{f.name}_path_to_yaml_file", Optional[str]))
+            new_fields.append((f"{f.name}_overwrite", Optional[field_type]))
+
         else:
             new_fields.append((f.name, field_type))
 
@@ -67,6 +71,6 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
 
 
 def make_partial_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
-    optional_paths_class = make_dataclass_with_optional_paths(cls=cls)
+    optional_paths_class = make_dataclass_with_optional_paths_and_overwrite(cls=cls)
     partial_with_optional_paths_class = make_partial_dataclass(cls=optional_paths_class)
     return partial_with_optional_paths_class

@@ -47,9 +47,7 @@ def test_parse_arguments():
     a2 = pars.parse_arguments(extra_args=None)
     print(a2)
 
-    a2 = pars.parse_arguments(
-        config_file_path= "tests/yaml_files/test_a2.yaml"
-    )
+    a2 = pars.parse_arguments(config_file_path="tests/yaml_files/test_a2.yaml")
     print(a2)
 
 
