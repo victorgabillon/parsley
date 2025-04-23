@@ -19,7 +19,7 @@ from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_extended_object,
     resolve_extended_object_to_dict,
 )
-from parsley_coco.utils import unflatten, IsDataclass, remove_none
+from parsley_coco.utils import unflatten, IsDataclass, remove_none, merge_nested_dicts
 
 
 class Parsley[T_Dataclass: IsDataclass]:
@@ -153,7 +153,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
-        first_merged_args = self.args_command_line | extra_args_dict
+        first_merged_args = merge_nested_dicts(self.args_command_line, extra_args_dict)
 
         # 'config_file_name' is a specific input that can be specified either in extra_args or in the command line
         # and that gives the path to a yaml file containing more args
@@ -175,7 +175,8 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         #  the gui input  overwrite  the command line arguments
         #  that overwrite the config file arguments that overwrite the default arguments
-        self.merged_args = self.args_config_file | first_merged_args
+
+        self.merged_args = merge_nested_dicts(self.args_config_file, first_merged_args)
 
         assert self.merged_args is not None
 
