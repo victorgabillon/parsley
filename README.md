@@ -34,6 +34,16 @@ pip install parsley-coco
 
 ## Usage
 
+### Table of Contents
+- [Basic Example](#basic-example)
+- [Precedence of Arguments](#precedence-of-arguments)
+- [Recursive YAML Parsing](#recursive-yaml-parsing)
+- [Default Behavior Without a Config File](#default-behavior-without-a-config-file)
+- [Command-Line Arguments Handling](#command-line-arguments-handling)
+- [Using `extra_args` with `parse_arguments`](#using-extra_args-with-parse_arguments)
+
+---
+
 ### Basic Example
 
 Define your dataclasses and use `create_parsley` to create a parser, then instantiate the dataclass from (for instance) a yaml conf file:
