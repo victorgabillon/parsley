@@ -36,6 +36,7 @@ pip install parsley-coco
 
 ### Table of Contents
 - [Basic Example](#basic-example)
+- [Input Arguments](#input-arguments)
 - [Precedence of Arguments](#precedence-of-arguments)
 - [Recursive YAML Parsing](#recursive-yaml-parsing)
 - [Default Behavior Without a Config File](#default-behavior-without-a-config-file)
@@ -61,6 +62,54 @@ parser: Parsley[Config] = create_parsley(Config)
 config: Config = parser.parse_arguments(config_file_path="path/to/config.yaml")
 print(config)
 ```
+
+### Input Arguments
+
+#### `create_parsley`
+
+The `create_parsley` function initializes a `Parsley` parser for a given dataclass.
+
+- **Arguments**:
+  1. **`dataclass_type`**:
+     - The dataclass type you want to parse (e.g., `Config`).
+     - This defines the structure of the configuration, including fields, types, and default values.
+  2. **`should_parse_command_line_arguments`** (optional):
+     - A boolean indicating whether command-line arguments should be parsed.
+     - Defaults to `True`. If set to `False`, command-line arguments will be ignored.
+
+- **Returns**:
+  - A `Parsley` parser instance that can parse arguments based on the provided dataclass.
+
+---
+
+#### `parse_arguments`
+
+The `parse_arguments` method of the `Parsley` parser parses arguments from multiple sources (command-line, YAML, `extra_args`).
+
+- **Arguments**:
+  1. **`extra_args`** (optional):
+     - A dataclass instance or dictionary containing additional arguments.
+     - These arguments are merged with other sources and take precedence over YAML but are overridden by command-line arguments.
+  2. **`config_file_path`** (optional):
+     - A string specifying the path to a YAML configuration file.
+     - If not provided, the parser looks for a `config_file_name` key in `extra_args` or command-line arguments.
+
+- **Returns**:
+  - An instance of the dataclass populated with the merged arguments from all sources.
+
+---
+
+
+
+### Argument Precedence
+
+The final configuration is determined by the following hierarchy (from highest to lowest priority):
+1. **Command-Line Arguments**
+2. **`extra_args`**
+3. **YAML Configuration File**
+4. **Default Values in the Dataclass**
+
+This ensures flexibility while maintaining a clear and predictable merging process.
 
 ### Precedence of Arguments
 
