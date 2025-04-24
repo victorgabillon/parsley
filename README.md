@@ -36,7 +36,7 @@ pip install parsley-coco
 
 ### Basic Example
 
-Define your dataclasses and use `create_parsley` to create a parser:
+Define your dataclasses and use `create_parsley` to create a parser, then instantiate the dataclass from (for instance) a yaml conf file:
 
 ```python
 from dataclasses import dataclass
@@ -48,7 +48,7 @@ class Config:
     y: str
 
 parser: Parsley[Config] = create_parsley(Config)
-config = parser.parse_arguments(config_file_path="path/to/config.yaml")
+config: Config = parser.parse_arguments(config_file_path="path/to/config.yaml")
 print(config)
 ```
 
