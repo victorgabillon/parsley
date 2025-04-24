@@ -99,18 +99,6 @@ The `parse_arguments` method of the `Parsley` parser parses arguments from multi
 
 ---
 
-
-
-### Argument Precedence
-
-The final configuration is determined by the following hierarchy (from highest to lowest priority):
-1. **Command-Line Arguments**
-2. **`extra_args`**
-3. **YAML Configuration File**
-4. **Default Values in the Dataclass**
-
-This ensures flexibility while maintaining a clear and predictable merging process.
-
 ### Precedence of Arguments
 
 Parsley Coco merges arguments from multiple sources in a specific order of precedence. The final configuration is determined by the following hierarchy (from highest to lowest priority):
