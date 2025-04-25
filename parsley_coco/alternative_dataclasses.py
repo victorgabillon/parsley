@@ -1,32 +1,83 @@
-from dataclasses import fields, make_dataclass, is_dataclass
-from typing import List, Tuple
-from typing import Optional, get_type_hints, Dict, Type, Any
+from dataclasses import fields, field, make_dataclass, is_dataclass, MISSING
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, get_type_hints
+from typing import Callable
 
 from parsley_coco.utils import is_or_contains_dataclass
 
 _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
 
-def make_dataclass_with_optional_paths_and_overwrite(cls: Type[Any]) -> Type[Any]:
+def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
+    origin = getattr(tp, "__origin__", None)
+    args = getattr(tp, "__args__", ())
+
+    if is_dataclass(tp):
+        return transform_fn(tp)
+
+    if origin is Union:
+        new_args = tuple(
+            (
+                replace_nested_types(arg, transform_fn)
+                if is_or_contains_dataclass(arg)
+                else arg
+            )
+            for arg in args
+        )
+        return Union[new_args]
+
+    return tp
+
+
+def make_dataclass_with_optional_paths_and_overwrite(
+    cls: Type[Any], _processed: Dict[Type[Any], Type[Any]] | None = None
+) -> Type[Any]:
     assert is_dataclass(cls), f"{cls} must be a dataclass"
 
-    new_fields: List[Tuple[str, Any]] = []
+    if _processed is None:
+        _processed = {}
+
+    if cls in _processed:
+        return _processed[cls]
+
     hints = get_type_hints(cls)
+    required_fields: List[Tuple[str, Any, Any]] = []
+    optional_fields: List[Tuple[str, Any, Any]] = []
 
     for f in fields(cls):
-        field_type = hints[f.name]
+        original_type = hints[f.name]
+        transformed_type = replace_nested_types(
+            original_type,
+            lambda subcls: make_dataclass_with_optional_paths_and_overwrite(
+                subcls, _processed
+            ),
+        )
 
-        # If it's a dataclass, add both the field and its '_path_to_yaml_file' sibling
-        if is_or_contains_dataclass(field_type):
-            new_fields.append((f.name, Optional[field_type]))
-            new_fields.append((f"{f.name}_path_to_yaml_file", Optional[str]))
-            new_fields.append((f"{f.name}_overwrite", Optional[field_type]))
-
+        if is_or_contains_dataclass(original_type):
+            optional_fields.append(
+                (f.name, Optional[transformed_type], field(default=None))
+            )
+            optional_fields.append(
+                (f"{f.name}_path_to_yaml_file", Optional[str], field(default=None))
+            )
+            optional_fields.append(
+                (f"{f.name}_overwrite", Optional[transformed_type], field(default=None))
+            )
         else:
-            new_fields.append((f.name, field_type))
+            if f.default is not MISSING:
+                optional_fields.append(
+                    (f.name, transformed_type, field(default=f.default))
+                )
+            elif f.default_factory is not MISSING:
+                optional_fields.append(
+                    (f.name, transformed_type, field(default_factory=f.default_factory))
+                )
+            else:
+                required_fields.append((f.name, transformed_type, field()))
 
-    new_cls_name = cls.__name__ + "_with_potential_path"
-    return make_dataclass(new_cls_name, new_fields)
+    new_cls_name = cls.__name__ + "_WithOptionalPath"
+    new_cls = make_dataclass(new_cls_name, required_fields + optional_fields)
+    _processed[cls] = new_cls
+    return new_cls
 
 
 def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
@@ -39,8 +90,8 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
     type_hints = get_type_hints(cls)
     partial_fields = []
 
-    for field in fields(cls):
-        field_type = type_hints[field.name]
+    for field_ in fields(cls):
+        field_type = type_hints[field_.name]
 
         # If it's a nested dataclass, recurse
         if is_dataclass(field_type):
@@ -52,9 +103,9 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
         # Make the field optional
         partial_fields.append(
             (
-                field.name,
+                field_.name,
                 Optional[partial_type],
-                field.default if field.default != field.default_factory else None,
+                field_.default if field_.default != field_.default_factory else None,
             )
         )
 

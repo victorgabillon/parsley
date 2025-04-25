@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parsley_coco"
-version = "0.1.13"
+version = "0.1.14"
 description = "A parser combining dacite and argparse"
 authors = [
     { name="Victor Gabillon", email="victorgabillon@gmail.com" }

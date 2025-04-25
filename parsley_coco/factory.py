@@ -63,7 +63,14 @@ def create_parsley[T_Dataclass: IsDataclass](
     field: Field[Any]
     for field in fields(args_dataclass_name):
         parser.add_argument(
-            str("--" + field.name), type=str, default=None, help="to be written"
+            str("--" + field.name),
+            type=str,
+            default=None,
+            help=(
+                field.metadata["description"]
+                if "description" in field.metadata
+                else "to be written in dataclass metadata"
+            ),
         )
 
     my_parser: Parsley[T_Dataclass] = Parsley(
