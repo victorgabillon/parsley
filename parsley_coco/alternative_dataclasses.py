@@ -1,5 +1,5 @@
 """Alternative dataclass utilities for handling optional paths and overwriting
-    dataclass fields."""
+dataclass fields."""
 
 from dataclasses import fields, field, make_dataclass, is_dataclass, MISSING
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, get_type_hints

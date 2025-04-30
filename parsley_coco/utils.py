@@ -1,4 +1,5 @@
-""" Utility functions for various operations."""
+"""Utility functions for various operations."""
+
 from dataclasses import is_dataclass
 from typing import Any
 from typing import ClassVar, Protocol
@@ -37,13 +38,13 @@ class IsDataclass(Protocol):
 
 
 def remove_none(d: dict[str, Any]) -> dict[str, Any]:
-    """ Recursively remove keys with None values from a dictionary.
+    """Recursively remove keys with None values from a dictionary.
     Args:
         d (dict): The input dictionary.
     Returns:
         dict: A new dictionary with None values removed.
     """
-    result_ :dict = {}
+    result_: dict[str, Any] = {}
     if isinstance(d, dict):
         result_ = {k: remove_none(v) for k, v in d.items() if v is not None}
     elif isinstance(d, list):
@@ -51,6 +52,7 @@ def remove_none(d: dict[str, Any]) -> dict[str, Any]:
     else:
         result_ = d
     return result_
+
 
 def is_or_contains_dataclass(t: Any) -> bool:
     """Check if the input is a dataclass or a Union that includes a dataclass."""

@@ -1,4 +1,5 @@
 """Logger module for the Parsley application."""
+
 # logger_module.py
 
 
@@ -17,8 +18,7 @@ if not parsley_logger.handlers:
     parsley_logger.propagate = False
 
 
-
-def set_parsley_logger(logger: logging.Logger):
+def set_parsley_logger(logger: logging.Logger) -> None:
     """Allow external injection of a logger."""
     global parsley_logger
     parsley_logger = logger

@@ -33,10 +33,11 @@ from parsley_coco.parser import Parsley
 from parsley_coco.utils import IsDataclass
 from parsley_coco.logger import set_parsley_logger
 
+
 def create_parsley[DataclassType: IsDataclass](
-        args_dataclass_name: Type[DataclassType],
-        should_parse_command_line_arguments: bool = True,
-        logger: logging.Logger | None = None
+    args_dataclass_name: Type[DataclassType],
+    should_parse_command_line_arguments: bool = True,
+    logger: logging.Logger | None = None,
 ) -> Parsley[DataclassType]:
     """
     Create an argument parser for command line arguments.

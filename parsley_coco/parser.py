@@ -23,6 +23,7 @@ from parsley_coco.utils import unflatten, IsDataclass, remove_none, merge_nested
 
 from parsley_coco.logger import parsley_logger
 
+
 class Parsley[T_Dataclass: IsDataclass]:
     """
     A class for parsing command line arguments and config file arguments.
@@ -55,10 +56,10 @@ class Parsley[T_Dataclass: IsDataclass]:
     args_dataclass_name: Type[T_Dataclass]
 
     def __init__(
-            self,
-            parser: Any,
-            args_dataclass_name: Type[T_Dataclass],
-            should_parse_command_line_arguments: bool = True,
+        self,
+        parser: Any,
+        args_dataclass_name: Type[T_Dataclass],
+        should_parse_command_line_arguments: bool = True,
     ) -> None:
         """
         Initialize the MyParser object.
@@ -124,7 +125,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         self.args_config_file = args_config_file
 
     def parse_arguments(
-            self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
+        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
     ) -> T_Dataclass:
         """
         Parse the command line arguments, config file arguments, and extra arguments.
@@ -198,8 +199,8 @@ class Parsley[T_Dataclass: IsDataclass]:
             output_folder (str): The output folder where the log file will be saved.
         """
         with open(
-                os.path.join(output_folder, "inputs_and_parsing/base_script_merge.yaml"),
-                "w",
-                encoding="utf-8",
+            os.path.join(output_folder, "inputs_and_parsing/base_script_merge.yaml"),
+            "w",
+            encoding="utf-8",
         ) as base_merge:
             yaml.dump(self.merged_args, base_merge, default_flow_style=False)

@@ -1,4 +1,5 @@
 """Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
+
 import types
 from dataclasses import fields, asdict
 from dataclasses import is_dataclass
