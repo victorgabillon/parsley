@@ -1,3 +1,4 @@
+""" Utility functions for various operations."""
 from dataclasses import is_dataclass
 from typing import Any
 from typing import ClassVar, Protocol
@@ -6,13 +7,19 @@ import types
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
-    result_dict: dict[Any, Any] = dict()
+    """Convert a flattened dictionary into a nested dictionary.
+    Args:
+        dictionary (dict): A dictionary with keys that are dot-separated strings.
+    Returns:
+        dict: A nested dictionary.
+    """
+    result_dict: dict[Any, Any] = {}
     for key, value in dictionary.items():
         parts = key.split(".")
         d = result_dict
         for part in parts[:-1]:
             if part not in d:
-                d[part] = dict()
+                d[part] = {}
             d = d[part]
         d[parts[-1]] = value
     return result_dict
@@ -30,13 +37,20 @@ class IsDataclass(Protocol):
 
 
 def remove_none(d: dict[str, Any]) -> dict[str, Any]:
+    """ Recursively remove keys with None values from a dictionary.
+    Args:
+        d (dict): The input dictionary.
+    Returns:
+        dict: A new dictionary with None values removed.
+    """
+    result_ :dict = {}
     if isinstance(d, dict):
-        return {k: remove_none(v) for k, v in d.items() if v is not None}
+        result_ = {k: remove_none(v) for k, v in d.items() if v is not None}
     elif isinstance(d, list):
-        return [remove_none(item) for item in d]
+        result_ = [remove_none(item) for item in d]
     else:
-        return d
-
+        result_ = d
+    return result_
 
 def is_or_contains_dataclass(t: Any) -> bool:
     """Check if the input is a dataclass or a Union that includes a dataclass."""
@@ -49,6 +63,13 @@ def is_or_contains_dataclass(t: Any) -> bool:
 
 
 def merge_nested_dicts(d1: dict[Any, Any], d2: dict[Any, Any]) -> dict[Any, Any]:
+    """Recursively merge two nested dictionaries.
+    Args:
+        d1 (dict): The first dictionary.
+        d2 (dict): The second dictionary.
+    Returns:
+        dict: A new dictionary that is the result of merging d1 and d2.
+    """
     result = d1.copy()
     for key, val in d2.items():
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):

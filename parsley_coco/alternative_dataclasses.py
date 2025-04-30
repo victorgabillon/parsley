@@ -1,3 +1,6 @@
+"""Alternative dataclass utilities for handling optional paths and overwriting
+    dataclass fields."""
+
 from dataclasses import fields, field, make_dataclass, is_dataclass, MISSING
 from typing import Any, Dict, List, Optional, Tuple, Type, Union, get_type_hints
 from typing import Callable
@@ -8,6 +11,13 @@ _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
 
 def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
+    """Recursively replace nested types in a dataclass with transformed types.
+    Args:
+        tp (Any): The type to transform.
+        transform_fn (Callable[[Any], Any]): A function that transforms the type.
+    Returns:
+        Any: The transformed type.
+    """
     origin = getattr(tp, "__origin__", None)
     args = getattr(tp, "__args__", ())
 
@@ -31,6 +41,17 @@ def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
 def make_dataclass_with_optional_paths_and_overwrite(
     cls: Type[Any], _processed: Dict[Type[Any], Type[Any]] | None = None
 ) -> Type[Any]:
+    """Create a dataclass with optional paths and overwrite fields.
+    This function takes a dataclass and creates a new dataclass with
+    additional fields for optional paths and overwrite values.
+    Args:
+        cls (Type[Any]): The dataclass to process.
+        _processed (Dict[Type[Any], Type[Any]] | None): A cache of processed dataclasses.
+    Returns:
+        Type[Any]: The new dataclass with optional paths and overwrite fields.
+    Raises:
+        ValueError: If the provided class is not a dataclass.
+    """
     assert is_dataclass(cls), f"{cls} must be a dataclass"
 
     if _processed is None:
@@ -81,6 +102,16 @@ def make_dataclass_with_optional_paths_and_overwrite(
 
 
 def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
+    """Create a partial dataclass from the given dataclass.
+    A partial dataclass allows for optional fields, making it easier to
+    work with incomplete data.
+    Args:
+        cls (Type[Any]): The dataclass to create a partial version of.
+    Returns:
+        Type[Any]: The partial dataclass.
+    Raises:
+        ValueError: If the provided class is not a dataclass.
+    """
     if cls in _partial_cache:
         return _partial_cache[cls]
 
@@ -122,6 +153,17 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
 
 
 def make_partial_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
+    """Create a partial dataclass with optional paths from the given dataclass.
+    This function combines the functionality of `make_partial_dataclass` and
+    `make_dataclass_with_optional_paths_and_overwrite` to create a new dataclass
+    that includes optional paths and overwrite fields.
+    Args:
+        cls (Type[Any]): The dataclass to create a partial version of.
+    Returns:
+        Type[Any]: The partial dataclass with optional paths.
+    Raises:
+        ValueError: If the provided class is not a dataclass.
+    """
     optional_paths_class = make_dataclass_with_optional_paths_and_overwrite(cls=cls)
     partial_with_optional_paths_class = make_partial_dataclass(cls=optional_paths_class)
     return partial_with_optional_paths_class

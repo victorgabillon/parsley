@@ -9,18 +9,19 @@ Classes:
 
 import os
 from dataclasses import asdict
-from typing import Any, Type
 from enum import Enum
-import yaml
+from typing import Any, Type
+
 import dacite
+import yaml
 
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_yaml_to_base,
-    resolve_extended_object,
     resolve_extended_object_to_dict,
 )
 from parsley_coco.utils import unflatten, IsDataclass, remove_none, merge_nested_dicts
 
+from parsley_coco.logger import parsley_logger
 
 class Parsley[T_Dataclass: IsDataclass]:
     """
@@ -54,10 +55,10 @@ class Parsley[T_Dataclass: IsDataclass]:
     args_dataclass_name: Type[T_Dataclass]
 
     def __init__(
-        self,
-        parser: Any,
-        args_dataclass_name: Type[T_Dataclass],
-        should_parse_command_line_arguments: bool = True,
+            self,
+            parser: Any,
+            args_dataclass_name: Type[T_Dataclass],
+            should_parse_command_line_arguments: bool = True,
     ) -> None:
         """
         Initialize the MyParser object.
@@ -83,7 +84,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         Returns:
             dict[str, Any]: A dictionary containing the parsed command line arguments.
         """
-        args_obj, unknown = self.parser.parse_known_args()
+        args_obj, _ = self.parser.parse_known_args()
         args_command_line = vars(args_obj)  # converting into dictionary format
         args_command_line_without_none: dict[str, Any] = {
             key: value for key, value in args_command_line.items() if value is not None
@@ -103,7 +104,7 @@ class Parsley[T_Dataclass: IsDataclass]:
             config_file_path (str): The path to the config file.
         """
         try:
-            with open(config_file_path, "r") as _:
+            with open(config_file_path, "r", encoding="utf-8") as _:
                 try:
                     # read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
                     dataclass_from_conf_file: T_Dataclass = resolve_yaml_to_base(
@@ -112,18 +113,18 @@ class Parsley[T_Dataclass: IsDataclass]:
 
                     # transforming back to dictionary to ease the potential future merges
                     args_config_file: dict[str, Any] = asdict(dataclass_from_conf_file)
-                    print(
-                        "Here are the yaml file arguments of the script",
+                    parsley_logger.info(
+                        "Here are the yaml file arguments of the script: %s",
                         args_config_file,
                     )
                 except yaml.YAMLError as exc:
-                    print(exc)
-        except IOError:
-            raise Exception("Could not read file:", config_file_path)
+                    parsley_logger.error(exc)
+        except IOError as exc:
+            raise ValueError("Could not read file:", config_file_path) from exc
         self.args_config_file = args_config_file
 
     def parse_arguments(
-        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
+            self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
     ) -> T_Dataclass:
         """
         Parse the command line arguments, config file arguments, and extra arguments.
@@ -163,12 +164,12 @@ class Parsley[T_Dataclass: IsDataclass]:
         if config_file_path is None:
             try:
                 self.args_config_file = asdict(self.args_dataclass_name())
-            except Exception:
-                raise Exception(
-                    "The Args dataclass should have all its attribute"
-                    " have default value to have a default instantiation."
-                    f" When dealing with {self.args_dataclass_name()}"
-                )
+            except TypeError as exc:
+                raise ValueError(
+                    "The Args dataclass should have all its attributes "
+                    "set to default values to allow default instantiation. "
+                    f"When dealing with {self.args_dataclass_name()}"
+                ) from exc
         else:
             self.parse_config_file_arguments(config_file_path)
         assert self.args_config_file is not None
@@ -197,7 +198,8 @@ class Parsley[T_Dataclass: IsDataclass]:
             output_folder (str): The output folder where the log file will be saved.
         """
         with open(
-            os.path.join(output_folder, "inputs_and_parsing/base_script_merge.yaml"),
-            "w",
+                os.path.join(output_folder, "inputs_and_parsing/base_script_merge.yaml"),
+                "w",
+                encoding="utf-8",
         ) as base_merge:
             yaml.dump(self.merged_args, base_merge, default_flow_style=False)

@@ -25,17 +25,19 @@ Example usage:
 """
 
 import argparse
+import logging
 from dataclasses import Field, fields
 from typing import Any, Type
 
 from parsley_coco.parser import Parsley
 from parsley_coco.utils import IsDataclass
+from parsley_coco.logger import set_parsley_logger
 
-
-def create_parsley[T_Dataclass: IsDataclass](
-    args_dataclass_name: Type[T_Dataclass],
-    should_parse_command_line_arguments: bool = True,
-) -> Parsley[T_Dataclass]:
+def create_parsley[DataclassType: IsDataclass](
+        args_dataclass_name: Type[DataclassType],
+        should_parse_command_line_arguments: bool = True,
+        logger: logging.Logger | None = None
+) -> Parsley[DataclassType]:
     """
     Create an argument parser for command line arguments.
 
@@ -47,6 +49,10 @@ def create_parsley[T_Dataclass: IsDataclass](
         An instance of MyParser, which is a custom wrapper around argparse.ArgumentParser.
 
     """
+
+    if logger is not None:
+        set_parsley_logger(logger=logger)
+
     parser: argparse.ArgumentParser = argparse.ArgumentParser()
 
     # one can specify a path to a yaml file containing parameters
@@ -73,7 +79,7 @@ def create_parsley[T_Dataclass: IsDataclass](
             ),
         )
 
-    my_parser: Parsley[T_Dataclass] = Parsley(
+    my_parser: Parsley[DataclassType] = Parsley(
         parser=parser,
         args_dataclass_name=args_dataclass_name,
         should_parse_command_line_arguments=should_parse_command_line_arguments,

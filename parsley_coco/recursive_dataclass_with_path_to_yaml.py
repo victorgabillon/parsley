@@ -1,3 +1,4 @@
+"""Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
 import types
 from dataclasses import fields, asdict
 from dataclasses import is_dataclass
@@ -24,13 +25,23 @@ from parsley_coco.utils import (
 def resolve_yaml_to_base[T_Dataclass: IsDataclass](
     yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
 ) -> T_Dataclass:
+    """Resolve a YAML file to a dataclass object.
+    Args:
+        yaml_path (str): The path to the YAML file.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
+        raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+    Returns:
+        T_Dataclass: The resolved dataclass object.
+    Raises:
+        Exception: If the YAML file cannot be read.
+    """
     extended_cls = make_dataclass_with_optional_paths_and_overwrite(base_cls)
 
     try:
-        with open(yaml_path, "r") as f:
+        with open(yaml_path, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
-    except IOError:
-        raise Exception("Could not read file:", yaml_path)
+    except IOError as exc:
+        raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
     extended_obj = from_dict(
         data_class=extended_cls, data=yaml_data, config=dacite.Config(cast=[Enum])
@@ -60,6 +71,14 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
 ) -> dict[str, Any]:
+    """Resolve an extended object to a dictionary.
+    Args:
+        extended_obj (IsDataclass): The extended object to resolve.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
+        raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+    Returns:
+        dict[str, Any]: The resolved dictionary.
+    """
     resolved_data: dict[str, Any] = {}
 
     for field in fields(base_cls):
@@ -150,6 +169,14 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
 def resolve_extended_object[T_Dataclass: IsDataclass](
     extended_obj: Any, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
 ) -> T_Dataclass:
+    """Resolve an extended object to a dataclass object.
+    Args:
+        extended_obj (Any): The extended object to resolve.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
+        raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+    Returns:
+        T_Dataclass: The resolved dataclass object.
+    """
     resolved_data: dict[str, Any] = resolve_extended_object_to_dict(
         extended_obj=extended_obj,
         base_cls=base_cls,
