@@ -1,10 +1,14 @@
 """Utility functions for various operations."""
 
+import types  # Import types to handle new-style Union
+from dataclasses import fields
 from dataclasses import is_dataclass
-from typing import Any
+from types import UnionType
+from typing import Any, Type, Union, get_args, get_origin
 from typing import ClassVar, Protocol
-from typing import Union, get_origin, get_args
-import types
+from typing import get_type_hints
+
+from dacite import from_dict, Config, UnionMatchError
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
@@ -54,14 +58,29 @@ def remove_none(d: dict[str, Any]) -> dict[str, Any]:
     return result_
 
 
-def is_or_contains_dataclass(t: Any) -> bool:
-    """Check if the input is a dataclass or a Union that includes a dataclass."""
-    origin = get_origin(t)
+def is_or_contains_dataclass(tp: Any) -> bool:
+    origin = get_origin(tp)
+    args = get_args(tp)
 
-    # Handle typing.Union and PEP 604 (Python 3.10+) unions
-    if origin is Union or isinstance(t, types.UnionType):
-        return any(is_or_contains_dataclass(arg) for arg in get_args(t))
-    return isinstance(t, type) and is_dataclass(t)
+    if is_dataclass(tp):
+        return True
+
+    if origin in (Union, UnionType):
+        return any(is_or_contains_dataclass(arg) for arg in args)
+
+    if origin in (list, tuple, set, dict):
+        return any(is_or_contains_dataclass(arg) for arg in args)
+
+    return False
+
+
+def extract_union_types(tp: Any) -> Union[Any, list[Any]]:
+    origin = get_origin(tp)
+
+    if origin in (Union, UnionType):
+        return list(get_args(tp))
+
+    return [tp]
 
 
 def merge_nested_dicts(d1: dict[Any, Any], d2: dict[Any, Any]) -> dict[Any, Any]:
@@ -87,3 +106,165 @@ def is_optional_type(t: Any) -> bool:
     args = get_args(t)
 
     return (origin is Union or isinstance(t, types.UnionType)) and type(None) in args
+
+
+def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
+    if seen is None:
+        seen = set()
+
+    prefix = "    " * indent
+
+    if cls in seen:
+        print(f"{prefix}{cls.__name__} (already seen)")
+        return
+    seen.add(cls)
+
+    if not is_dataclass(cls):
+        print(f"{prefix}{get_pretty_type(cls)} (not a dataclass)")
+        return
+
+    print(f"{prefix}{cls.__name__}:")
+    hints = get_type_hints(cls)
+
+    for field in fields(cls):
+        field_type = hints.get(field.name, field.type)
+        type_str = get_pretty_type(field_type)
+        print(f"{prefix}  - {field.name}: {type_str}")
+
+        # Recurse into all dataclass components in this field
+        for sub_type in extract_dataclass_types(field_type):
+            print_dataclass_schema(sub_type, indent + 1, seen)
+
+
+def get_pretty_type(tp: Any) -> str:
+    """Return a human-readable version of the type."""
+    origin = get_origin(tp)
+    args = get_args(tp)
+
+    if origin is None:
+        if isinstance(tp, type):
+            return tp.__name__
+        return str(tp)
+
+    if origin is {Union, types.UnionType}:
+        return " | ".join(get_pretty_type(arg) for arg in args)
+
+    if hasattr(origin, "__name__"):
+        return f"{origin.__name__}[{', '.join(get_pretty_type(arg) for arg in args)}]"
+    return str(tp)
+
+
+def extract_dataclass_types(tp: Any) -> Any:
+    """Yield all dataclass types contained within the given type."""
+    origin = get_origin(tp)
+    args = get_args(tp)
+
+    if origin is {Union, types.UnionType}:
+        for arg in args:
+            yield from extract_dataclass_types(arg)
+    elif origin in (list, tuple, set, dict):
+        for arg in args:
+            yield from extract_dataclass_types(arg)
+    elif is_dataclass(tp):
+        yield tp
+
+
+def from_dict_with_union_handling[Dataclass: IsDataclass](
+    data_class: Type[Dataclass], data: dict[Any, Any], config: Config | None = None
+) -> Dataclass:
+    """
+    Wrapper around dacite.from_dict to handle Union types more gracefully, including nested dictionaries.
+
+    Args:
+        data_class (Type[Any]): The target data class.
+        data (dict): The dictionary to parse.
+        config (Config, optional): dacite configuration.
+
+    Returns:
+        Any: An instance of the data class.
+
+    Raises:
+        Exception: If parsing fails for all types in the Union.
+    """
+    print_dataclass_schema(data_class)
+    try:
+        # Attempt to parse normally
+        a = from_dict(data_class=data_class, data=data, config=config)
+        return a
+    except UnionMatchError as e:
+        # Handle UnionMatchError
+        print(f"Handling UnionMatchError for {data_class}")
+        if get_origin(data_class) in {
+            Union,
+            types.UnionType,
+        }:  # Check for both old and new Union
+            union_types = get_args(data_class)  # Extract types from the Union
+            errors = []
+            for union_type in union_types:
+                try:
+                    # Try parsing with each type in the Union
+                    print(f"Trying to parse with union type: {union_type}")
+                    _ = from_dict_with_union_handling(union_type, data, config)
+                except Exception as inner_error:
+                    # Collect errors for debugging
+                    errors.append(f"Failed with {union_type}: {inner_error}")
+
+            # If all attempts fail, raise a clean error message
+            error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
+            error_message += "\n".join(errors)
+            raise Exception(error_message) from None
+        # If it's a dataclass, recursively handle nested fields
+        elif is_dataclass(data_class):
+            print(f"Handling dataclass: {data_class.__name__}")
+            field_errors = []
+            for field in data_class.__annotations__:
+                field_type = data_class.__annotations__[field]
+                print(
+                    f"Processing field: {field} of type {field_type}, is"
+                    f" Union: {get_origin(field_type) in {Union, types.UnionType}}"
+                )
+                if get_origin(field_type) in {
+                    Union,
+                    types.UnionType,
+                }:  # Check for both old and new Union
+                    # Extract types from the Union
+                    union_types = get_args(field_type)
+                    errors = []
+                    for union_type in union_types:
+                        try:
+                            # Try parsing with each type in the Union
+                            print(f"Trying to parse with union type: {union_type}")
+                            _ = from_dict_with_union_handling(
+                                union_type, data[field], config
+                            )
+                        except Exception as inner_error:
+                            # Collect errors for debugging
+                            errors.append(f"Failed with {union_type}: {inner_error}")
+
+                    # If all attempts fail, raise a clean error message
+                    error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
+                    error_message += "\n".join(errors)
+
+                # Check if the field is a nested dataclass
+                elif is_dataclass(field_type):
+                    try:
+                        # Recursively parse the nested dataclass
+                        print(f"Recursively parsing nested dataclass field '{field}'")
+                        data[field] = from_dict_with_union_handling(
+                            field_type, data[field], config
+                        )
+                    except Exception as inner_error:
+                        field_errors.append(
+                            f"Failed to parse nested dataclass field '{field}': {inner_error}"
+                        )
+            if field_errors:
+                raise Exception("\n".join(field_errors)) from None
+            else:
+                raise e  # Re-raise if no specific Union handling was needed
+        else:
+            # Re-raise the original exception if it's not a Union or dataclass
+            raise e
+    except Exception as e:
+        # Handle other exceptions
+        print(f"An error occurred: {e}")
+        raise Exception(f"An error occurred: {e}") from None

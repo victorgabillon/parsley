@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from parsley_coco.recursive_dataclass_with_path_to_yaml import resolve_yaml_to_base
+from parsley_coco.recursive_dataclass_with_path_to_yaml import (
+    resolve_yaml_file_to_base_dataclass,
+)
 
 
 @dataclass
@@ -40,12 +42,16 @@ class A2:
 
 
 def test_resolve_dataclass_from_yaml():
-    final_result = resolve_yaml_to_base("tests/yaml_files/test_a.yaml", A)
+    final_result = resolve_yaml_file_to_base_dataclass(
+        "tests/yaml_files/test_a.yaml", A
+    )
     print(final_result)
 
 
 def test_resolve_dataclass_from_yaml_2():
-    final_result = resolve_yaml_to_base("tests/yaml_files/test_a2.yaml", A2)
+    final_result = resolve_yaml_file_to_base_dataclass(
+        "tests/yaml_files/test_a2.yaml", A2
+    )
     print(final_result)
 
 

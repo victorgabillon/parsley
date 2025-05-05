@@ -2,8 +2,9 @@
 dataclass fields."""
 
 from dataclasses import fields, field, make_dataclass, is_dataclass, MISSING
-from typing import Any, Dict, List, Optional, Tuple, Type, Union, get_type_hints
-from typing import Callable
+from types import UnionType
+from typing import Any, Callable, Union, get_origin, get_args
+from typing import Dict, List, Optional, Tuple, Type, get_type_hints
 
 from parsley_coco.utils import is_or_contains_dataclass
 
@@ -11,29 +12,22 @@ _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
 
 def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
-    """Recursively replace nested types in a dataclass with transformed types.
-    Args:
-        tp (Any): The type to transform.
-        transform_fn (Callable[[Any], Any]): A function that transforms the type.
-    Returns:
-        Any: The transformed type.
-    """
-    origin = getattr(tp, "__origin__", None)
-    args = getattr(tp, "__args__", ())
+    """Recursively replace dataclasses nested inside a type."""
+    origin = get_origin(tp)
+    args = get_args(tp)
 
+    # Base case: if it's a dataclass type, transform it
     if is_dataclass(tp):
         return transform_fn(tp)
 
-    if origin is Union:
-        new_args = tuple(
-            (
-                replace_nested_types(arg, transform_fn)
-                if is_or_contains_dataclass(arg)
-                else arg
-            )
-            for arg in args
-        )
-        return Union[new_args]
+    # Handle Union (typing.Union or new-style A | B)
+    if origin in (Union, UnionType):
+        return Union[tuple(replace_nested_types(arg, transform_fn) for arg in args)]
+
+    # Handle generic containers: List[X], Dict[K, V], etc.
+    if origin:
+        new_args = tuple(replace_nested_types(arg, transform_fn) for arg in args)
+        return origin[new_args]
 
     return tp
 

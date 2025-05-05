@@ -16,7 +16,7 @@ import dacite
 import yaml
 
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
-    resolve_yaml_to_base,
+    resolve_yaml_file_to_base_dataclass,
     resolve_extended_object_to_dict,
 )
 from parsley_coco.utils import unflatten, IsDataclass, remove_none, merge_nested_dicts
@@ -108,8 +108,11 @@ class Parsley[T_Dataclass: IsDataclass]:
             with open(config_file_path, "r", encoding="utf-8") as _:
                 try:
                     # read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
-                    dataclass_from_conf_file: T_Dataclass = resolve_yaml_to_base(
-                        yaml_path=config_file_path, base_cls=self.args_dataclass_name
+                    dataclass_from_conf_file: T_Dataclass = (
+                        resolve_yaml_file_to_base_dataclass(
+                            yaml_path=config_file_path,
+                            base_cls=self.args_dataclass_name,
+                        )
                     )
 
                     # transforming back to dictionary to ease the potential future merges

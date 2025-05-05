@@ -1,8 +1,8 @@
 """Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
 
 import types
-from dataclasses import fields, asdict
-from dataclasses import is_dataclass
+from dataclasses import asdict
+from dataclasses import is_dataclass, fields
 from enum import Enum
 from typing import Any, Type
 from typing import Union, get_origin, get_args
@@ -20,10 +20,12 @@ from parsley_coco.utils import (
     is_or_contains_dataclass,
     merge_nested_dicts,
     is_optional_type,
+    from_dict_with_union_handling,
+    extract_union_types,
 )
 
 
-def resolve_yaml_to_base[T_Dataclass: IsDataclass](
+def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
 ) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
@@ -44,13 +46,15 @@ def resolve_yaml_to_base[T_Dataclass: IsDataclass](
     except IOError as exc:
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
-    extended_obj = from_dict(
+    extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=yaml_data, config=dacite.Config(cast=[Enum])
     )
 
-    return resolve_extended_object(
+    resolve_extended_object_ = resolve_extended_object(
         extended_obj, base_cls, raise_error_with_nones=raise_error_with_nones
     )
+
+    return resolve_extended_object_
 
 
 def extract_dataclass_type(t: Any) -> type | None:
@@ -80,6 +84,9 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     Returns:
         dict[str, Any]: The resolved dictionary.
     """
+
+    # it looks like we do not allow any attribute to be a union of dataclassa and int for instance, think if desired in the long run
+    # should we handle list and dict and tupl in a specific way in combination with dataclass, think about it? no use cas yet
     resolved_data: dict[str, Any] = {}
 
     for field in fields(base_cls):
@@ -97,23 +104,17 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             and not is_dataclass(val)
             and not hasattr(val, "get_yaml_file_path")
         )
+
         if is_or_contains_dataclass(base_field_type) and not value_base:
 
-            dataclass_type = extract_dataclass_type(base_field_type)
-            assert dataclass_type is not None
-
-            if dataclass_type is None and raise_error_with_nones:
-
-                raise TypeError(
-                    f"Cannot resolve field '{field.name}': expected dataclass in type {base_field_type}"
-                )
+            # assert dataclass_type is not None
 
             final_resolved_val: dict[str, Any] = {}
             if path_val is not None:
                 resolved_val = asdict(
-                    resolve_yaml_to_base(
+                    resolve_yaml_file_to_base_dataclass(
                         yaml_path=path_val,
-                        base_cls=dataclass_type,
+                        base_cls=base_field_type,
                         raise_error_with_nones=raise_error_with_nones,
                     )
                 )
@@ -123,31 +124,65 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
 
             if val is not None:
                 if is_dataclass(val):
-                    resolved_val = resolve_extended_object_to_dict(
-                        extended_obj=cast(IsDataclass, val),
-                        base_cls=dataclass_type,
-                        raise_error_with_nones=raise_error_with_nones,
-                    )
+                    dataclass_type_list = extract_union_types(base_field_type)
+                    for dataclass_type in dataclass_type_list:
+                        try:
+                            resolved_val_temp = resolve_extended_object_to_dict(
+                                extended_obj=cast(IsDataclass, val),
+                                base_cls=dataclass_type,
+                                raise_error_with_nones=raise_error_with_nones,
+                            )
+                            _ = from_dict(
+                                data_class=dataclass_type, data=resolved_val_temp
+                            )
+                            resolved_val = resolved_val_temp
+                        except Exception:
+                            pass  # print('uu',inst)
+
+                    assert resolved_val is not None
                 else:  # Non-dataclass value in a Union — allowed
                     assert hasattr(val, "get_yaml_file_path")
-                    resolved_val = asdict(
-                        resolve_yaml_to_base(
-                            yaml_path=val.get_yaml_file_path(),
-                            base_cls=dataclass_type,
-                            raise_error_with_nones=raise_error_with_nones,
-                        )
-                    )
+                    dataclass_type_list = extract_union_types(base_field_type)
+                    for dataclass_type in dataclass_type_list:
+                        try:
+                            resolved_val_temp = asdict(
+                                resolve_yaml_file_to_base_dataclass(
+                                    yaml_path=val.get_yaml_file_path(),
+                                    base_cls=dataclass_type,
+                                    raise_error_with_nones=raise_error_with_nones,
+                                )
+                            )
+                            _ = from_dict(
+                                data_class=dataclass_type, data=resolved_val_temp
+                            )
+                            resolved_val = resolved_val_temp
+                        except Exception:
+                            pass  # print('uu',inst)
+                    assert resolved_val is not None
 
                 final_resolved_val = merge_nested_dicts(
                     final_resolved_val, resolved_val
                 )
             if overwrite_val:
                 assert is_dataclass(overwrite_val)
-                overwrite_resolved_val = resolve_extended_object_to_dict(
-                    extended_obj=cast(IsDataclass, overwrite_val),
-                    base_cls=dataclass_type,
-                    raise_error_with_nones=raise_error_with_nones,
-                )
+                dataclass_type_list = extract_union_types(base_field_type)
+                for dataclass_type in dataclass_type_list:
+                    try:
+                        overwrite_resolved_val_temp = resolve_extended_object_to_dict(
+                            extended_obj=cast(IsDataclass, overwrite_val),
+                            base_cls=dataclass_type,
+                            raise_error_with_nones=raise_error_with_nones,
+                        )
+                        _ = from_dict(
+                            data_class=dataclass_type, data=overwrite_resolved_val_temp
+                        )
+                        overwrite_resolved_val = overwrite_resolved_val_temp
+
+                    except Exception:
+                        pass  # print('uu',inst)
+
+                assert overwrite_resolved_val is not None
+
                 final_resolved_val = merge_nested_dicts(
                     final_resolved_val, overwrite_resolved_val
                 )
@@ -161,6 +196,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             resolved_data[field.name] = final_resolved_val
 
         else:
+            assert value_base
             # Not a dataclass or dataclass-union field — just assign as-is
             resolved_data[field.name] = val
 
@@ -178,12 +214,15 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
     Returns:
         T_Dataclass: The resolved dataclass object.
     """
+
     resolved_data: dict[str, Any] = resolve_extended_object_to_dict(
         extended_obj=extended_obj,
         base_cls=base_cls,
         raise_error_with_nones=raise_error_with_nones,
     )
 
-    return from_dict(
+    result = from_dict_with_union_handling(
         data_class=base_cls, data=resolved_data, config=dacite.Config(cast=[Enum])
     )
+
+    return result
