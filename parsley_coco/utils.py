@@ -268,3 +268,20 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
         # Handle other exceptions
         print(f"An error occurred: {e}")
         raise Exception(f"An error occurred: {e}") from None
+
+
+def remove_none_values(d: dict[Any, Any]) -> dict[Any, Any]:
+    """Recursively remove keys with None values from a nested dictionary."""
+    if not isinstance(d, dict):
+        return d  # Leave non-dict values untouched
+
+    result = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            nested = remove_none_values(v)
+            if nested:  # Only keep non-empty dicts
+                result[k] = nested
+        elif v is not None:
+            result[k] = v
+
+    return result

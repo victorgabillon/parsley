@@ -1,10 +1,21 @@
 """Alternative dataclass utilities for handling optional paths and overwriting
 dataclass fields."""
 
-from dataclasses import fields, field, make_dataclass, is_dataclass, MISSING
+import types
+from dataclasses import field, fields, is_dataclass, make_dataclass, MISSING
 from types import UnionType
-from typing import Any, Callable, Union, get_origin, get_args
-from typing import Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import (
+    Any,
+    Dict,
+    Optional,
+    Type,
+    Union,
+    get_type_hints,
+    get_origin,
+    get_args,
+)
+from typing import Callable
+from typing import List, Tuple
 
 from parsley_coco.utils import is_or_contains_dataclass
 
@@ -95,17 +106,31 @@ def make_dataclass_with_optional_paths_and_overwrite(
     return new_cls
 
 
+def transform_type_for_partial(tp: Any) -> Any:
+    """Recursively transform types by replacing any dataclass with its partial version."""
+    origin = get_origin(tp)
+    args = get_args(tp)
+
+    # Direct dataclass
+    if is_dataclass(tp):
+        return Optional[make_partial_dataclass(tp)]
+
+    # Union[...] or A | B
+    if origin in (Union, UnionType):
+        new_args = []
+        for arg in args:
+            if is_dataclass(arg):
+                new_args.append(make_partial_dataclass(arg))
+            else:
+                new_args.append(arg)
+        return Optional[Union[tuple(new_args)]]
+
+    # Other types (List, Dict, etc.) — no recursion here unless needed
+    return Optional[tp]
+
+
 def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
-    """Create a partial dataclass from the given dataclass.
-    A partial dataclass allows for optional fields, making it easier to
-    work with incomplete data.
-    Args:
-        cls (Type[Any]): The dataclass to create a partial version of.
-    Returns:
-        Type[Any]: The partial dataclass.
-    Raises:
-        ValueError: If the provided class is not a dataclass.
-    """
+    """Create a partial dataclass with all fields optional, including nested dataclasses inside Unions."""
     if cls in _partial_cache:
         return _partial_cache[cls]
 
@@ -115,32 +140,22 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
     type_hints = get_type_hints(cls)
     partial_fields = []
 
-    for field_ in fields(cls):
-        field_type = type_hints[field_.name]
+    for f in fields(cls):
+        field_type = type_hints[f.name]
+        transformed_type = transform_type_for_partial(field_type)
 
-        # If it's a nested dataclass, recurse
-        if is_dataclass(field_type):
-            assert isinstance(field_type, type)
-            partial_type = make_partial_dataclass(field_type)
+        if f.default is not MISSING:
+            default_spec = field(default=f.default)
+        elif f.default_factory is not MISSING:
+            default_spec = field(default_factory=f.default_factory)
         else:
-            partial_type = field_type
+            default_spec = field(default=None)
 
-        # Make the field optional
-        partial_fields.append(
-            (
-                field_.name,
-                Optional[partial_type],
-                field_.default if field_.default != field_.default_factory else None,
-            )
-        )
+        partial_fields.append((f.name, transformed_type, default_spec))
 
-    # Create the new Partial dataclass
-    partial_cls_name = f"Partial{cls.__name__}"
-
-    annotations = {name: typ for name, typ, *_ in partial_fields}
-    partial_cls = make_dataclass(
-        partial_cls_name, partial_fields, namespace={"__annotations__": annotations}
-    )
+    new_cls_name = f"Partial{cls.__name__}"
+    partial_cls = make_dataclass(new_cls_name, partial_fields)
+    partial_cls.__module__ = cls.__module__
 
     _partial_cache[cls] = partial_cls
     return partial_cls

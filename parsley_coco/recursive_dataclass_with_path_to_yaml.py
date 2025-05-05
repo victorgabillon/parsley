@@ -14,6 +14,7 @@ from dacite import from_dict
 
 from parsley_coco.alternative_dataclasses import (
     make_dataclass_with_optional_paths_and_overwrite,
+    make_partial_dataclass,
 )
 from parsley_coco.utils import (
     IsDataclass,
@@ -22,7 +23,9 @@ from parsley_coco.utils import (
     is_optional_type,
     from_dict_with_union_handling,
     extract_union_types,
+    remove_none_values,
 )
+from parsley_coco.logger import parsley_logger
 
 
 def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
@@ -132,15 +135,20 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                                 base_cls=dataclass_type,
                                 raise_error_with_nones=raise_error_with_nones,
                             )
+
                             _ = from_dict(
                                 data_class=dataclass_type, data=resolved_val_temp
                             )
                             resolved_val = resolved_val_temp
+
                         except Exception:
-                            pass  # print('uu',inst)
+                            parsley_logger.debug(
+                                f"fail {field.name} dataclass", dataclass_type, val
+                            )
 
                     assert resolved_val is not None
                 else:  # Non-dataclass value in a Union — allowed
+
                     assert hasattr(val, "get_yaml_file_path")
                     dataclass_type_list = extract_union_types(base_field_type)
                     for dataclass_type in dataclass_type_list:
@@ -157,29 +165,40 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                             )
                             resolved_val = resolved_val_temp
                         except Exception:
-                            pass  # print('uu',inst)
+                            parsley_logger.debug(
+                                f"fail {field.name} yaml", dataclass_type, val
+                            )
+
                     assert resolved_val is not None
 
                 final_resolved_val = merge_nested_dicts(
                     final_resolved_val, resolved_val
                 )
+
             if overwrite_val:
                 assert is_dataclass(overwrite_val)
                 dataclass_type_list = extract_union_types(base_field_type)
                 for dataclass_type in dataclass_type_list:
+
                     try:
+
                         overwrite_resolved_val_temp = resolve_extended_object_to_dict(
                             extended_obj=cast(IsDataclass, overwrite_val),
-                            base_cls=dataclass_type,
-                            raise_error_with_nones=raise_error_with_nones,
+                            base_cls=make_partial_dataclass(dataclass_type),
+                            raise_error_with_nones=False,
                         )
-                        _ = from_dict(
-                            data_class=dataclass_type, data=overwrite_resolved_val_temp
+
+                        ## todo this makes None not able to overwrite anything which is weak
+                        overwrite_resolved_val = remove_none_values(
+                            overwrite_resolved_val_temp
                         )
-                        overwrite_resolved_val = overwrite_resolved_val_temp
 
                     except Exception:
-                        pass  # print('uu',inst)
+                        parsley_logger.debug(
+                            f"fail {field.name} overwrite",
+                            dataclass_type,
+                            overwrite_val,
+                        )
 
                 assert overwrite_resolved_val is not None
 
@@ -196,7 +215,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             resolved_data[field.name] = final_resolved_val
 
         else:
-            assert value_base
+            assert value_base or not raise_error_with_nones
             # Not a dataclass or dataclass-union field — just assign as-is
             resolved_data[field.name] = val
 
