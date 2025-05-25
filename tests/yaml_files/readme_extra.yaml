@@ -1,0 +1,4 @@
+x: 10
+y: "hello"
+nested_config:
+  z: 42

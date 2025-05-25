@@ -191,7 +191,9 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             if val is not notfilled:
                 if is_dataclass(val):
                     dataclass_type_list = extract_union_types(base_field_type)
+
                     for dataclass_type in dataclass_type_list:
+
                         try:
                             resolved_val_temp = resolve_extended_object_to_dict(
                                 extended_obj=cast(IsDataclass, val),
@@ -238,8 +240,6 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                 final_resolved_val = merge_nested_dicts(
                     final_resolved_val, resolved_val
                 )
-
-                print("final_resolved_val", final_resolved_val)
 
             if overwrite_val is not notfilled:
                 assert is_dataclass(overwrite_val)

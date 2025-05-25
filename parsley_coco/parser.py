@@ -166,7 +166,9 @@ class Parsley[T_Dataclass: IsDataclass]:
             dict[str, Any]: A dictionary containing the merged arguments.
         """
 
-        print("Parsing arguments with command line args", args_command_line)
+        parsley_logger.info(
+            "Parsing arguments with command line args %s", args_command_line
+        )
         if args_command_line is None:
             args_command_line = {}
 
@@ -176,12 +178,15 @@ class Parsley[T_Dataclass: IsDataclass]:
         else:
             extra_args_dict = resolve_extended_object_to_dict(
                 extended_obj=extra_args,
-                base_cls=self.args_dataclass_name,
+                base_cls=make_partial_dataclass_with_optional_paths(
+                    self.args_dataclass_name
+                ),
                 raise_error_with_notfilled=False,
             )
             extra_args_dict = remove_notfilled_values(d=extra_args_dict)
 
-        print("Extra args dict", extra_args_dict)
+        parsley_logger.info("Extra args dict %s", extra_args_dict)
+
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
         first_merged_args = merge_nested_dicts(args_command_line, extra_args_dict)
@@ -198,10 +203,9 @@ class Parsley[T_Dataclass: IsDataclass]:
                 raise ValueError(
                     "The Args dataclass should have all its attributes "
                     "set to default values to allow default instantiation. "
-                    f"When dealing with {self.args_dataclass_name()}"
+                    f"When dealing with {self.args_dataclass_name}()"
                 ) from exc
         else:
-
             self.parse_config_file_arguments(config_file_path)
         assert self.args_config_file is not None
 
@@ -212,7 +216,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         assert self.merged_args is not None
 
-        print("Merged args", self.merged_args)
+        parsley_logger.info("Merged args %s", self.merged_args)
         # Converting the args in the standardized dataclass
         dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
