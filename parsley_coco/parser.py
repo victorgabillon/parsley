@@ -15,13 +15,25 @@ from typing import Any, Type
 import dacite
 import yaml
 
+from parsley_coco.alternative_dataclasses import (
+    make_partial_dataclass,
+    make_partial_dataclass_with_optional_paths,
+)
+from parsley_coco.logger import parsley_logger
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
+    resolve_dict_to_base_dataclass,
+    resolve_extended_dict_to_dict_allow_notfilled,
     resolve_yaml_file_to_base_dataclass,
     resolve_extended_object_to_dict,
 )
-from parsley_coco.utils import unflatten, IsDataclass, remove_none, merge_nested_dicts
-
-from parsley_coco.logger import parsley_logger
+from parsley_coco.utils import (
+    extend_with_config,
+    remove_notfilled_values,
+    unflatten,
+    IsDataclass,
+    remove_none,
+    merge_nested_dicts,
+)
 
 
 class Parsley[T_Dataclass: IsDataclass]:
@@ -49,7 +61,6 @@ class Parsley[T_Dataclass: IsDataclass]:
     """
 
     parser: Any
-    args_command_line: dict[str, Any] | None
     args_config_file: dict[str, Any] | None
     merged_args: dict[str, Any] | None
     should_parse_command_line_arguments: bool = True
@@ -74,18 +85,21 @@ class Parsley[T_Dataclass: IsDataclass]:
         self.args_dataclass_name = args_dataclass_name
 
         # attributes to be set and saved at runtime
-        self.args_command_line = None
         self.args_config_file = None
         self.merged_args = None
 
-    def parse_command_line_arguments(self) -> dict[str, Any]:
+    def parse_command_line_arguments(
+        self, args: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Parse the command line arguments using the parser object.
 
         Returns:
             dict[str, Any]: A dictionary containing the parsed command line arguments.
         """
-        args_obj, _ = self.parser.parse_known_args()
+
+        args_obj, _ = self.parser.parse_known_args(args=args)
+
         args_command_line = vars(args_obj)  # converting into dictionary format
         args_command_line_without_none: dict[str, Any] = {
             key: value for key, value in args_command_line.items() if value is not None
@@ -95,7 +109,15 @@ class Parsley[T_Dataclass: IsDataclass]:
             args_command_line_without_none
         )
 
-        return args_command_line_without_none_unflatten
+        parsed_command_line_dict = resolve_extended_dict_to_dict_allow_notfilled(
+            dicto=args_command_line_without_none_unflatten,
+            base_cls=extend_with_config(cls=self.args_dataclass_name),
+            raise_error_with_nones=False,
+        )
+
+        parsed_command_line_dict = remove_notfilled_values(d=parsed_command_line_dict)
+
+        return parsed_command_line_dict
 
     def parse_config_file_arguments(self, config_file_path: str) -> None:
         """
@@ -127,8 +149,11 @@ class Parsley[T_Dataclass: IsDataclass]:
             raise ValueError("Could not read file:", config_file_path) from exc
         self.args_config_file = args_config_file
 
-    def parse_arguments(
-        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
+    def parse_arguments_with_command_line_args(
+        self,
+        extra_args: IsDataclass | None = None,
+        config_file_path: str | None = None,
+        args_command_line: dict[str, Any] | None = None,
     ) -> T_Dataclass:
         """
         Parse the command line arguments, config file arguments, and extra arguments.
@@ -140,6 +165,11 @@ class Parsley[T_Dataclass: IsDataclass]:
         Returns:
             dict[str, Any]: A dictionary containing the merged arguments.
         """
+
+        print("Parsing arguments with command line args", args_command_line)
+        if args_command_line is None:
+            args_command_line = {}
+
         extra_args_dict: dict[str, Any]
         if extra_args is None:
             extra_args_dict = {}
@@ -147,18 +177,14 @@ class Parsley[T_Dataclass: IsDataclass]:
             extra_args_dict = resolve_extended_object_to_dict(
                 extended_obj=extra_args,
                 base_cls=self.args_dataclass_name,
-                raise_error_with_nones=False,
+                raise_error_with_notfilled=False,
             )
-            extra_args_dict = remove_none(d=extra_args_dict)
+            extra_args_dict = remove_notfilled_values(d=extra_args_dict)
 
-        if self.should_parse_command_line_arguments:
-            self.args_command_line = self.parse_command_line_arguments()
-        else:
-            self.args_command_line = {}
-
+        print("Extra args dict", extra_args_dict)
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
-        first_merged_args = merge_nested_dicts(self.args_command_line, extra_args_dict)
+        first_merged_args = merge_nested_dicts(args_command_line, extra_args_dict)
 
         # 'config_file_name' is a specific input that can be specified either in extra_args or in the command line
         # and that gives the path to a yaml file containing more args
@@ -175,6 +201,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                     f"When dealing with {self.args_dataclass_name()}"
                 ) from exc
         else:
+
             self.parse_config_file_arguments(config_file_path)
         assert self.args_config_file is not None
 
@@ -185,6 +212,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         assert self.merged_args is not None
 
+        print("Merged args", self.merged_args)
         # Converting the args in the standardized dataclass
         dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
@@ -193,6 +221,31 @@ class Parsley[T_Dataclass: IsDataclass]:
         )
 
         return dataclass_args
+
+    def parse_arguments(
+        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
+    ) -> T_Dataclass:
+        """
+        Parse the command line arguments, config file arguments, and extra arguments.
+
+        Args:
+            extra_args (dict[str, Any], optional): Extra arguments to be merged with the parsed arguments.
+            Defaults to None.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the merged arguments.
+        """
+        args_command_line: dict[str, Any]
+        if self.should_parse_command_line_arguments:
+            args_command_line = self.parse_command_line_arguments()
+        else:
+            args_command_line = {}
+
+        return self.parse_arguments_with_command_line_args(
+            extra_args=extra_args,
+            config_file_path=config_file_path,
+            args_command_line=args_command_line,
+        )
 
     def log_parser_info(self, output_folder: str) -> None:
         """

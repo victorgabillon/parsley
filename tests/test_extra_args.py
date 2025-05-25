@@ -10,15 +10,15 @@ class TestDataClass:
     first_attribute: int = 2
 
 
-def test_creation():
+def test_extra_args():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(
         should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass
     )
-    args = parsley.parse_arguments(extra_args=None)
+    args = parsley.parse_arguments(extra_args=TestDataClass(first_attribute=5))
 
-    assert args == TestDataClass()
+    assert args == TestDataClass(first_attribute=5)
 
 
 if __name__ == "__main__":
-    test_creation()
+    test_extra_args()

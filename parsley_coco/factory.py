@@ -29,8 +29,14 @@ import logging
 from dataclasses import Field, fields
 from typing import Any, Type
 
+
+from parsley_coco.alternative_dataclasses import (
+    make_partial_dataclass,
+    make_partial_dataclass_notfilled,
+    make_partial_dataclass_with_optional_paths,
+)
 from parsley_coco.parser import Parsley
-from parsley_coco.utils import IsDataclass
+from parsley_coco.utils import IsDataclass, add_arguments_from_dataclass
 from parsley_coco.logger import set_parsley_logger
 
 
@@ -65,20 +71,13 @@ def create_parsley[DataclassType: IsDataclass](
         help="path to a yaml file with arguments for the script",
     )
 
-    # one can  specify parameters from the class named args_class_name
-    # that will overwrite the ones in the yaml file
-    field: Field[Any]
-    for field in fields(args_dataclass_name):
-        parser.add_argument(
-            str("--" + field.name),
-            type=str,
-            default=None,
-            help=(
-                field.metadata["description"]
-                if "description" in field.metadata
-                else "to be written in dataclass metadata"
-            ),
-        )
+    # data_class = make_partial_dataclass(cls=args_dataclass_name)
+    add_arguments_from_dataclass(
+        parser=parser,
+        cls=make_partial_dataclass_with_optional_paths(cls=args_dataclass_name),
+    )
+
+    # add_arguments_from_dataclass(parser=parser, cls=args_dataclass_name)
 
     my_parser: Parsley[DataclassType] = Parsley(
         parser=parser,

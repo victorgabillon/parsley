@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Type,
     Union,
+    Literal,
     get_type_hints,
     get_origin,
     get_args,
@@ -18,6 +19,8 @@ from typing import Callable
 from typing import List, Tuple
 
 from parsley_coco.utils import is_or_contains_dataclass
+from parsley_coco.sentinels import notfilled, _NotFilled
+
 
 _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
@@ -26,6 +29,10 @@ def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
     """Recursively replace dataclasses nested inside a type."""
     origin = get_origin(tp)
     args = get_args(tp)
+
+    # Skip Literal types
+    if origin is Literal:
+        return tp
 
     # Base case: if it's a dataclass type, transform it
     if is_dataclass(tp):
@@ -111,15 +118,18 @@ def transform_type_for_partial(tp: Any) -> Any:
     origin = get_origin(tp)
     args = get_args(tp)
 
-    # Direct dataclass
-    if is_dataclass(tp):
+    if origin is Literal:
+        return Optional[tp]
+
+    # Direct dataclass type
+    if isinstance(tp, type) and is_dataclass(tp):
         return Optional[make_partial_dataclass(tp)]
 
     # Union[...] or A | B
     if origin in (Union, UnionType):
         new_args = []
         for arg in args:
-            if is_dataclass(arg):
+            if isinstance(arg, type) and is_dataclass(arg):
                 new_args.append(make_partial_dataclass(arg))
             else:
                 new_args.append(arg)
@@ -129,8 +139,11 @@ def transform_type_for_partial(tp: Any) -> Any:
     return Optional[tp]
 
 
+_partial_cache = {}
+
+
 def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
-    """Create a partial dataclass with all fields optional, including nested dataclasses inside Unions."""
+    """Create a partial dataclass with all fields optional and defaulting to None, including nested dataclasses inside Unions."""
     if cls in _partial_cache:
         return _partial_cache[cls]
 
@@ -144,17 +157,66 @@ def make_partial_dataclass(cls: Type[Any]) -> Type[Any]:
         field_type = type_hints[f.name]
         transformed_type = transform_type_for_partial(field_type)
 
-        if f.default is not MISSING:
-            default_spec = field(default=f.default)
-        elif f.default_factory is not MISSING:
-            default_spec = field(default_factory=f.default_factory)
-        else:
-            default_spec = field(default=None)
+        # Force all fields to default to None
+        default_spec = field(default=None)
 
         partial_fields.append((f.name, transformed_type, default_spec))
 
     new_cls_name = f"Partial{cls.__name__}"
-    partial_cls = make_dataclass(new_cls_name, partial_fields)
+    partial_cls = make_dataclass(new_cls_name, partial_fields, kw_only=True)
+    partial_cls.__module__ = cls.__module__
+
+    _partial_cache[cls] = partial_cls
+    return partial_cls
+
+
+def transform_type_for_notfilled(tp: Any) -> Any:
+    origin = get_origin(tp)
+    args = get_args(tp)
+
+    if origin is Literal:
+        return Union[tp, _NotFilled]
+
+    # If this is a dataclass type, return a Union of the partial version and notfilled
+    if isinstance(tp, type) and is_dataclass(tp):
+        return Union[make_partial_dataclass_notfilled(tp), _NotFilled]
+
+    # If this is a Union, recurse on each arg and add _NotFilled to the mix
+    if origin in (Union, UnionType):
+        new_args = [transform_type_for_notfilled(arg) for arg in args]
+        return Union[tuple(new_args + [_NotFilled])]
+
+    # If this is a generic like List[X] or Dict[K, V], apply recursively to the args
+    if origin:
+        new_args = [transform_type_for_notfilled(arg) for arg in args]
+        return origin[tuple(new_args)] | _NotFilled
+
+    # Base case: primitive or unknown type — just allow Union[type, _NotFilled]
+    return Union[tp, _NotFilled]
+
+
+def make_partial_dataclass_notfilled(cls: Type[Any]) -> Type[Any]:
+    """Create a partial dataclass where every field defaults to `notfilled`, recursively."""
+    if cls in _partial_cache:
+        return _partial_cache[cls]
+
+    if not is_dataclass(cls):
+        raise ValueError(f"{cls} is not a dataclass")
+
+    type_hints = get_type_hints(cls)
+    partial_fields = []
+
+    for f in fields(cls):
+        field_type = type_hints[f.name]
+        transformed_type = transform_type_for_notfilled(field_type)
+
+        # Default to `notfilled`
+        default_spec = field(default=notfilled)
+
+        partial_fields.append((f.name, transformed_type, default_spec))
+
+    new_cls_name = f"Partial{cls.__name__}_NotFilled"
+    partial_cls = make_dataclass(new_cls_name, partial_fields, kw_only=True)
     partial_cls.__module__ = cls.__module__
 
     _partial_cache[cls] = partial_cls
@@ -174,5 +236,7 @@ def make_partial_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
         ValueError: If the provided class is not a dataclass.
     """
     optional_paths_class = make_dataclass_with_optional_paths_and_overwrite(cls=cls)
-    partial_with_optional_paths_class = make_partial_dataclass(cls=optional_paths_class)
+    partial_with_optional_paths_class = make_partial_dataclass_notfilled(
+        cls=optional_paths_class
+    )
     return partial_with_optional_paths_class

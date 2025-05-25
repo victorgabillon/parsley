@@ -145,16 +145,19 @@ Consider the following setup:
 #### Code Example
 
 ```python
-from parsley_coco import create_parsley, Parsley
+from parsley_coco.alternative_dataclasses import make_dataclass_with_optional_paths_and_overwrite, make_partial_dataclass_with_optional_paths
+from parsley_coco.factory import create_parsley
 
 parser = create_parsley(Config)
 
+# creating an extented config dataclass that allows more flexibility (more later in the readme)
+ExtendedConfig = make_partial_dataclass_with_optional_paths(Config)
+
 # Parse arguments
 config = parser.parse_arguments(
-    config_file_path="config.yaml",
-    extra_args={"y": "from_extra"}
+    config_file_path="tests/yaml_files/config.yaml",
+    extra_args=ExtendedConfig(y= "from_extra")
 )
-print(config)
 ```
 
 #### Resulting Configuration
@@ -171,6 +174,52 @@ Config(x=42, y="from_extra")
 ---
 
 This updated explanation reflects the correct precedence order based on the implementation in the library. Let me know if you need further clarification or adjustments!
+
+### Union Types, Defaults, and Discriminator Fields
+
+Parsley Coco uses [dacite](https://github.com/konradhalas/dacite) for parsing dictionaries into dataclasses, with `Config(strict=False)`. This means that if a dataclass field is a union of multiple types (e.g., `int | MyDataClass`), and the dataclass has default values, **any compatible type in the union can be used during parsing**. For example, if your YAML provides an integer, it will be parsed as an `int`; if it provides a mapping, it will be parsed as a dataclass.
+
+**However, when using unions of dataclasses, we strongly recommend adding a discriminator field (such as `Literal["my_type"]`) to each dataclass.** This helps `dacite` and Parsley Coco reliably determine which dataclass to instantiate when parsing nested structures.
+
+#### Example
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class OptionA:
+    discriminator: Literal["A"]
+    value: int
+
+@dataclass
+class OptionB:
+    discriminator: Literal["B"]
+    name: str
+
+@dataclass
+class Config:
+    option: OptionA | OptionB | int = 0
+```
+
+**YAML Example:**
+```yaml
+option:
+  discriminator: B
+  name: "hello"
+```
+
+This will be parsed as `Config(option=OptionB(discriminator="B", name="hello"))`.
+
+**YAML Example:**
+```yaml
+option: 42
+```
+
+This will be parsed as `Config(option=42)`.
+
+**Recommendation:**
+Always include a `discriminator` field (using `Literal[...]`) in each dataclass used in a union. This ensures robust and predictable parsing, especially when your configuration can match multiple types.
 
 ### Recursive YAML Parsing
 

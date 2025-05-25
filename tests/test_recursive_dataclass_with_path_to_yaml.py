@@ -29,12 +29,6 @@ class BIM:
 
 
 @dataclass
-class C:
-    x: int
-    y: str
-
-
-@dataclass
 class A2:
     a: int
     roo: C

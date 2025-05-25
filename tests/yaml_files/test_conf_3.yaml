@@ -1,0 +1,5 @@
+first_attribute_o:
+    first_attribute: 3
+    second_attribute:  "defaultxx"
+first_attribute_o_overwrite:
+  first_attribute: 11

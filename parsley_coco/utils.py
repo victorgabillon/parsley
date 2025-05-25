@@ -1,5 +1,7 @@
 """Utility functions for various operations."""
 
+from collections.abc import Mapping
+from re import sub
 import types  # Import types to handle new-style Union
 from dataclasses import fields
 from dataclasses import is_dataclass
@@ -7,8 +9,12 @@ from types import UnionType
 from typing import Any, Type, Union, get_args, get_origin
 from typing import ClassVar, Protocol
 from typing import get_type_hints
-
+from dataclasses import MISSING, make_dataclass, dataclass
 from dacite import from_dict, Config, UnionMatchError
+import argparse
+from typing import cast
+
+from parsley_coco.sentinels import notfilled
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
@@ -123,15 +129,22 @@ def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
         print(f"{prefix}{get_pretty_type(cls)} (not a dataclass)")
         return
 
-    print(f"{prefix}{cls.__name__}:")
     hints = get_type_hints(cls)
 
     for field in fields(cls):
         field_type = hints.get(field.name, field.type)
         type_str = get_pretty_type(field_type)
-        print(f"{prefix}  - {field.name}: {type_str}")
+        # Include default value if available
+        if field.default is not MISSING:
+            default_str = f" = {field.default!r}"
+        elif field.default_factory is not MISSING:
+            default_str = " = <factory>"
+        else:
+            default_str = ""
 
-        # Recurse into all dataclass components in this field
+        print(f"{prefix}  - {field.name}: {type_str}{default_str}")
+
+        # Recurse into nested dataclasses
         for sub_type in extract_dataclass_types(field_type):
             print_dataclass_schema(sub_type, indent + 1, seen)
 
@@ -146,7 +159,7 @@ def get_pretty_type(tp: Any) -> str:
             return tp.__name__
         return str(tp)
 
-    if origin is {Union, types.UnionType}:
+    if origin in {Union, types.UnionType}:
         return " | ".join(get_pretty_type(arg) for arg in args)
 
     if hasattr(origin, "__name__"):
@@ -159,7 +172,7 @@ def extract_dataclass_types(tp: Any) -> Any:
     origin = get_origin(tp)
     args = get_args(tp)
 
-    if origin is {Union, types.UnionType}:
+    if origin in {Union, types.UnionType}:
         for arg in args:
             yield from extract_dataclass_types(arg)
     elif origin in (list, tuple, set, dict):
@@ -187,8 +200,10 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
         Exception: If parsing fails for all types in the Union.
     """
     print_dataclass_schema(data_class)
+
     try:
         # Attempt to parse normally
+        # config.strict=True
         a = from_dict(data_class=data_class, data=data, config=config)
         return a
     except UnionMatchError as e:
@@ -248,11 +263,15 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                 # Check if the field is a nested dataclass
                 elif is_dataclass(field_type):
                     try:
-                        # Recursively parse the nested dataclass
-                        print(f"Recursively parsing nested dataclass field '{field}'")
-                        data[field] = from_dict_with_union_handling(
-                            field_type, data[field], config
-                        )
+                        value = data[field]
+                        # Only re-parse if the value is a dict (raw data), not an already-parsed instance
+                        if isinstance(value, Mapping):
+                            print(
+                                f"Recursively parsing nested dataclass field '{field}'"
+                            )
+                            data[field] = from_dict_with_union_handling(
+                                cast(type, field_type), dict(value), config
+                            )
                     except Exception as inner_error:
                         field_errors.append(
                             f"Failed to parse nested dataclass field '{field}': {inner_error}"
@@ -285,3 +304,79 @@ def remove_none_values(d: dict[Any, Any]) -> dict[Any, Any]:
             result[k] = v
 
     return result
+
+
+def remove_notfilled_values(d: dict[Any, Any]) -> dict[Any, Any]:
+    """Recursively remove keys with None values from a nested dictionary."""
+    if not isinstance(d, dict):
+        return d  # Leave non-dict values untouched
+
+    result = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            nested = remove_notfilled_values(v)
+            if nested:  # Only keep non-empty dicts
+                result[k] = nested
+        elif v is not notfilled:
+            result[k] = v
+
+    return result
+
+
+def resolve_type(typ: Any) -> Any:
+    origin = get_origin(typ)
+    if origin is Union:
+        args = [
+            arg for arg in get_args(typ) if arg not in (type(None), type(notfilled))
+        ]
+        if len(args) == 1:
+            return args[0]
+        # Fallback if multiple types remain – assume str or raise
+        return str
+    return typ
+
+
+# --- Helper to flatten dataclass fields ---
+def flatten_fields(cls: Type[Any], prefix: str = "") -> dict[str, Any]:
+    flat_fields = {}
+    for f in fields(cls):
+        field_type = f.type
+        full_name = f"{prefix}{f.name}" if prefix else f.name
+        if is_or_contains_dataclass(field_type):
+            for sub_type in extract_dataclass_types(field_type):
+                flat_fields.update(flatten_fields(sub_type, prefix=full_name + "."))
+        else:
+            flat_fields[full_name] = f
+    return flat_fields
+
+
+# --- Add argparse arguments from flat fields ---
+def add_arguments_from_dataclass(
+    parser: argparse.ArgumentParser, cls: Type[Any]
+) -> None:
+    flat_fields = flatten_fields(cls)
+    for name, f in flat_fields.items():
+        parser.add_argument(
+            f"--{name}",
+            type=resolve_type(f.type),
+            default=None,
+            help=(
+                f.metadata["description"]
+                if "description" in f.metadata
+                else "to be written in dataclass metadata"
+            ),
+        )
+
+
+def extend_with_config(cls: Type[Any]) -> Type[Any]:
+    # Extract existing fields
+    original_fields = [(f.name, f.type) for f in fields(cls)]
+    # Add the new one
+    extended_fields = original_fields + [("config_file_name", str)]
+    # Create a new dataclass dynamically
+    return make_dataclass(cls.__name__ + "WithConfig", extended_fields, bases=(cls,))
+
+
+class NotFilledType:
+    def __repr__(self) -> str:
+        return "<notfilled>"
