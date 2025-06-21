@@ -52,10 +52,9 @@ def test_creation():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(args_dataclass_name=TestDataClass2)
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_int_dataclass1.yaml"
+        config_file_path="tests_parsley/yaml_files/test_int_dataclass1.yaml"
     )
 
-    print(args)
     assert args == TestDataClass2(first_attribute=2)
 
 
@@ -63,10 +62,9 @@ def test_creation2():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(args_dataclass_name=TestDataClass2)
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_int_dataclass2.yaml"
+        config_file_path="tests_parsley/yaml_files/test_int_dataclass2.yaml"
     )
 
-    print(args)
     assert args == TestDataClass2(first_attribute=TestDataClass(first_attribute=4))
 
 
@@ -74,10 +72,9 @@ def test_creation3():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(args_dataclass_name=TestDataClass3)
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_int_dataclass2.yaml"
+        config_file_path="tests_parsley/yaml_files/test_int_dataclass2.yaml"
     )
 
-    print(args)
     assert args == TestDataClass3(first_attribute=TestDataClass(first_attribute=4))
 
 
@@ -85,10 +82,9 @@ def test_creation4():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(args_dataclass_name=TestDataClass4)
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_int_dataclass3.yaml"
+        config_file_path="tests_parsley/yaml_files/test_int_dataclass3.yaml"
     )
 
-    print(args)
     assert args == TestDataClass4(
         first_attribute=TestDataClasswu(discriminator="uu", first_attributef=4)
     )

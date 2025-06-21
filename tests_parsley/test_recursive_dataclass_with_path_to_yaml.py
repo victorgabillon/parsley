@@ -37,14 +37,14 @@ class A2:
 
 def test_resolve_dataclass_from_yaml():
     final_result = resolve_yaml_file_to_base_dataclass(
-        "tests/yaml_files/test_a.yaml", A
+        "tests_parsley/yaml_files/test_a.yaml", A
     )
     print(final_result)
 
 
 def test_resolve_dataclass_from_yaml_2():
     final_result = resolve_yaml_file_to_base_dataclass(
-        "tests/yaml_files/test_a2.yaml", A2
+        "tests_parsley/yaml_files/test_a2.yaml", A2
     )
     print(final_result)
 
@@ -52,3 +52,4 @@ def test_resolve_dataclass_from_yaml_2():
 if __name__ == "__main__":
     test_resolve_dataclass_from_yaml()
     test_resolve_dataclass_from_yaml_2()
+    print("All tests passed successfully.")

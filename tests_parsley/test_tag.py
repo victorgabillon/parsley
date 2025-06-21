@@ -14,7 +14,7 @@ class Tags(str, Enum):
 
     def get_yaml_file_path(self) -> str:
         """Get the YAML file path for the tag."""
-        return f"tests/yaml_files/{self.value}.yaml"
+        return f"tests_parsley/yaml_files/{self.value}.yaml"
 
 
 class TagsYwo(str, Enum):
@@ -25,7 +25,7 @@ class TagsYwo(str, Enum):
 
     def get_yaml_file_path(self) -> str:
         """Get the YAML file path for the tag."""
-        return f"tests/yaml_files/{self.value}.yaml"
+        return f"tests_parsley/yaml_files/{self.value}.yaml"
 
 
 class TagsYwo2(str, Enum):
@@ -36,7 +36,7 @@ class TagsYwo2(str, Enum):
 
     def get_yaml_file_path(self) -> str:
         """Get the YAML file path for the tag."""
-        return f"tests/yaml_files/{self.value}.yaml"
+        return f"tests_parsley/yaml_files/{self.value}.yaml"
 
 
 @dataclass
@@ -85,10 +85,9 @@ def test_creation():
         should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass2
     )
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_conf_tag.yaml"
+        config_file_path="tests_parsley/yaml_files/test_conf_tag.yaml"
     )
 
-    print(args)
     assert args == TestDataClass2(
         first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
     )
@@ -100,10 +99,9 @@ def test_creation_2():
         should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass3
     )
     args = parsley.parse_arguments(
-        config_file_path="tests/yaml_files/test_conf_tag_ywo.yaml"
+        config_file_path="tests_parsley/yaml_files/test_conf_tag_ywo.yaml"
     )
 
-    print(args)
     assert args == TestDataClass3(
         first_attribute=TestDataClassYwo(
             discriminator="ywo",

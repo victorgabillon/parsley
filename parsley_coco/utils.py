@@ -199,7 +199,7 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
     Raises:
         Exception: If parsing fails for all types in the Union.
     """
-    print_dataclass_schema(data_class)
+    # print_dataclass_schema(data_class)
 
     try:
         # Attempt to parse normally

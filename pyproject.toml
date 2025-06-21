@@ -14,7 +14,8 @@ license = { file="LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
     "PyYAML>=6.0.2",
-    "dacite>=1.9.2"
+    "dacite>=1.9.2",
+    "click==8.1.8"
 ]
 
 
@@ -25,11 +26,12 @@ test = ["pytest>=7.0","types-PyYAML"]
 [project.urls]
 "Homepage" = "https://github.com/victorgabillon/parsley"
 
+
 [tool.setuptools]
-#package-dir = {"" = "parsley_coco"}
+py-modules = []
 
 [tool.pytest.ini_options]
 testpaths = [
     "parsley_coco",
-    "tests"
+    "tests_parsley"
 ]

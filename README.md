@@ -38,7 +38,9 @@ pip install parsley-coco
 - [Basic Example](#basic-example)
 - [Input Arguments](#input-arguments)
 - [Precedence of Arguments](#precedence-of-arguments)
+- [Union Types, Defaults, and Discriminator Fields](#union-types-defaults-and-discriminator-fields)
 - [Recursive YAML Parsing](#recursive-yaml-parsing)
+- [Using Classes with a YAML Path Method (e.g., Enum Integration)](#using-classes-with-a-yaml-path-method-eg-enum-integration)
 - [Default Behavior Without a Config File](#default-behavior-without-a-config-file)
 - [Command-Line Arguments Handling](#command-line-arguments-handling)
 - [Using `extra_args` with `parse_arguments`](#using-extra_args-with-parse_arguments)
@@ -155,7 +157,7 @@ ExtendedConfig = make_partial_dataclass_with_optional_paths(Config)
 
 # Parse arguments
 config = parser.parse_arguments(
-    config_file_path="tests/yaml_files/config.yaml",
+    config_file_path="tests_parsley/yaml_files/config.yaml",
     extra_args=ExtendedConfig(y= "from_extra")
 )
 ```
@@ -252,7 +254,7 @@ class NestedConfig:
 class Config:
     x: int
     y: str
-    nested_config: Optional[NestedConfig] = None
+    nested_config: NestedConfig
 
 parser: Parsley[Config] = create_parsley(Config)
 config = parser.parse_arguments(config_file_path="path/to/config.yaml")
@@ -266,6 +268,68 @@ In this example:
 
 This ensures that the recursive YAML parsing works seamlessly with your dataclass structure.
 
+### Using Classes with a YAML Path Method (e.g., Enum Integration)
+
+Parsley Coco supports advanced configuration patterns where a field in your dataclass can be an object (such as an Enum member) that provides a method to retrieve a YAML file path. If the class has a method (for example, `get_yaml_file_path`) that returns the path to a YAML file, Parsley will automatically load and parse the YAML file to instantiate the corresponding object.
+
+This is especially useful for scenarios where you want to select a configuration "profile" or "preset" by name, and have the details loaded from a separate YAML file.
+
+#### Example
+
+Suppose you have an Enum for model presets, and each preset has a YAML file describing its configuration:
+
+```python
+from enum import Enum
+from dataclasses import dataclass
+from parsley_coco import create_parsley, Parsley
+
+class ModelPreset(str, Enum):
+    small = "small"
+    large = "large"
+
+    def get_yaml_file_path(self) -> str:
+        return f"presets/{self.value}.yaml"
+
+@dataclass
+class ModelConfig:
+    preset: ModelPreset
+    # other fields...
+
+@dataclass
+class AppConfig:
+    model: ModelConfig
+```
+
+**YAML Example (`config.yaml`):**
+```yaml
+model:
+  preset: large
+```
+
+**YAML Example (`presets/large.yaml`):**
+```yaml
+# Any fields for ModelConfig, e.g.:
+layers: 24
+hidden_size: 1024
+```
+
+#### How it works
+
+- When you specify `preset: large` in your main YAML, Parsley will instantiate the `ModelPreset.large` enum.
+- Since `ModelPreset` has a `get_yaml_file_path` method, Parsley will call this method to get the path (`presets/large.yaml`), load the YAML file, and use its contents to populate the `ModelConfig` dataclass.
+
+#### Usage
+
+```python
+parser = create_parsley(AppConfig)
+config = parser.parse_arguments(config_file_path="config.yaml")
+print(config)
+```
+
+This pattern allows you to keep your main configuration clean and delegate detailed settings to separate YAML files, referenced by simple tags or enum values.
+
+**Tip:**
+You can use this approach with any class, not just Enums, as long as it provides a `get_yaml_file_path()` method returning the YAML path as a string.
 
 ### Default Behavior Without a Config File
 

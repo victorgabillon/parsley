@@ -126,6 +126,10 @@ class Parsley[T_Dataclass: IsDataclass]:
         Args:
             config_file_path (str): The path to the config file.
         """
+        parsley_logger.info(
+            "parse_config_file_arguments,self.args_dataclass_name: %s",
+            self.args_dataclass_name,
+        )
         try:
             with open(config_file_path, "r", encoding="utf-8") as _:
                 try:
@@ -146,7 +150,12 @@ class Parsley[T_Dataclass: IsDataclass]:
                 except yaml.YAMLError as exc:
                     parsley_logger.error(exc)
         except IOError as exc:
-            raise ValueError("Could not read file:", config_file_path) from exc
+            raise ValueError(
+                "Could not process file:",
+                config_file_path,
+                "as ",
+                self.args_dataclass_name,
+            ) from exc
         self.args_config_file = args_config_file
 
     def parse_arguments_with_command_line_args(

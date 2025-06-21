@@ -51,10 +51,10 @@ def test_cli_nested_dict_output():
     )
 
     args = parsley.parse_command_line_arguments(
-        args=["--config_file_name", "tests/yaml_files/test_conf_2.yaml", "--gg", "5"]
+        args=["--config_file_name", "tests_parsley/yaml_files/test_conf_2.yaml", "--gg", "5"]
     )
 
-    assert args == {"config_file_name": "tests/yaml_files/test_conf_2.yaml"}
+    assert args == {"config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml"}
 
 
 def test_cli_nested_dict_output_2():
@@ -63,10 +63,10 @@ def test_cli_nested_dict_output_2():
     )
 
     args = parsley.parse_command_line_arguments(
-        args=["--config_file_name", "tests/yaml_files/test_conf_2.yaml", "--a", "5"]
+        args=["--config_file_name", "tests_parsley/yaml_files/test_conf_2.yaml", "--a", "5"]
     )
 
-    assert args == {"config_file_name": "tests/yaml_files/test_conf_2.yaml", "a": 5}
+    assert args == {"config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml", "a": 5}
 
 
 def test_cli_nested_dict_output_3():
@@ -77,7 +77,7 @@ def test_cli_nested_dict_output_3():
     args = parsley.parse_command_line_arguments(
         args=[
             "--config_file_name",
-            "tests/yaml_files/test_conf_2.yaml",
+            "tests_parsley/yaml_files/test_conf_2.yaml",
             "--a",
             "5",
             "--roo.x",
@@ -86,7 +86,7 @@ def test_cli_nested_dict_output_3():
     )
 
     assert args == {
-        "config_file_name": "tests/yaml_files/test_conf_2.yaml",
+        "config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml",
         "a": 5,
         "roo": {"x": 5},
     }
@@ -100,16 +100,16 @@ def test_cli_nested_dict_output_4():
     args = parsley.parse_command_line_arguments(
         args=[
             "--config_file_name",
-            "tests/yaml_files/test_conf_2.yaml",
+            "tests_parsley/yaml_files/test_conf_2.yaml",
             "--a",
             "5",
             "--roo_path_to_yaml_file",
-            "tests/yaml_files/test_b.yaml",
+            "tests_parsley/yaml_files/test_b.yaml",
         ]
     )
 
     assert args == {
-        "config_file_name": "tests/yaml_files/test_conf_2.yaml",
+        "config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml",
         "a": 5,
         "roo": {"x": 10, "y": "hello"},
     }
@@ -123,11 +123,11 @@ def test_cli_nested_dict_output_5():
     args = parsley.parse_command_line_arguments(
         args=[
             "--config_file_name",
-            "tests/yaml_files/test_conf_2.yaml",
+            "tests_parsley/yaml_files/test_conf_2.yaml",
             "--a",
             "5",
             "--roo_path_to_yaml_file",
-            "tests/yaml_files/test_b.yaml",
+            "tests_parsley/yaml_files/test_b.yaml",
             "--roo_overwrite.y",
             "hellii",
         ]
@@ -135,7 +135,7 @@ def test_cli_nested_dict_output_5():
     print("args debu", args)
 
     assert args == {
-        "config_file_name": "tests/yaml_files/test_conf_2.yaml",
+        "config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml",
         "a": 5,
         "roo": {"x": 10, "y": "hellii"},
     }

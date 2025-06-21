@@ -1,0 +1,3 @@
+x: 10
+y: "hello"
+nested_config_path_to_yaml_file: "tests_parsley/yaml_files/nested_2.yaml"

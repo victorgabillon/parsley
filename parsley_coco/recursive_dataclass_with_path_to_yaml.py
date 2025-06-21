@@ -86,7 +86,6 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
-    # print_dataclass_schema(cls=extended_cls)
 
     resolve_extended_object_ = resolve_extended_object(
         extended_obj, base_cls, raise_error_with_nones=raise_error_with_nones

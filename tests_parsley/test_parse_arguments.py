@@ -56,7 +56,7 @@ def test_parse_arguments():
         bim=BIM(i=159, hop=HOP(i=789, b=C(x=4578, y="uio"))),
     )
 
-    a2 = pars.parse_arguments(config_file_path="tests/yaml_files/test_a2.yaml")
+    a2 = pars.parse_arguments(config_file_path="tests_parsley/yaml_files/test_a2.yaml")
     assert a2 == A2(
         a=42, roo=C(x=10, y="hello"), bim=BIM(i=42, hop=HOP(i=42, b=C(x=10, y="hello")))
     )
