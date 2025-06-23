@@ -69,7 +69,8 @@ def test_extra_args() -> None:
 
     # Parse arguments with extra_args
     config = parser.parse_arguments(
-        config_file_path="tests_parsley/yaml_files/readme_extra.yaml", extra_args=extra_args
+        config_file_path="tests_parsley/yaml_files/readme_extra.yaml",
+        extra_args=extra_args,
     )
 
     assert config == Config2(x=20, y="hello", nested_config=NestedConfig(z=100))
@@ -164,7 +165,9 @@ def test_recursive_yaml() -> None:
     parser: Parsley[Config6] = create_parsley(Config6)
 
     # Parse arguments with extra_args
-    config = parser.parse_arguments(config_file_path="tests_parsley/yaml_files/nested_1.yaml")
+    config = parser.parse_arguments(
+        config_file_path="tests_parsley/yaml_files/nested_1.yaml"
+    )
 
     assert config == Config6(x=10, y="hello", nested_config=NestedConfig2(z=42))
 

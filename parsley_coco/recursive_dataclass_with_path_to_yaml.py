@@ -32,7 +32,7 @@ from parsley_coco.utils import (
 )
 from parsley_coco.logger import parsley_logger
 
-from parsley_coco.sentinels import notfilled
+from parsley_coco.sentinels import is_notfilled, notfilled
 
 
 def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
@@ -94,6 +94,34 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     return resolve_extended_object_
 
 
+def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
+    yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+) -> dict[str, Any]:
+    """Resolve a YAML file to a dataclass object.
+    Args:
+        yaml_path (str): The path to the YAML file.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
+        raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+    Returns:
+        T_Dataclass: The resolved dataclass object.
+    Raises:
+        Exception: If the YAML file cannot be read.
+    """
+
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            yaml_data = yaml.safe_load(f)
+    except IOError as exc:
+        print(f" debug Error reading file {yaml_path}: {exc}")
+        raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
+
+    return resolve_extended_dict_to_dict_allow_notfilled(
+        dicto=yaml_data,
+        base_cls=base_cls,
+        raise_error_with_nones=raise_error_with_nones,
+    )
+
+
 def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
 ) -> T_Dataclass:
@@ -112,6 +140,7 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
         with open(yaml_path, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
+        print(f" debug Error reading file {yaml_path}: {exc}")
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
     return resolve_dict_to_base_dataclass(
@@ -154,13 +183,14 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     resolved_data: dict[str, Any] = {}
 
     for field in fields(base_cls):
+
         base_field_type = field.type
         val = getattr(extended_obj, field.name, notfilled)
         path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
         overwrite_val = getattr(extended_obj, f"{field.name}_overwrite", notfilled)
 
         # assert isinstance(base_field_type, type)
-        value_base: bool = val is not notfilled
+        value_base: bool = not is_notfilled(val)
         value_base = (
             value_base
             and not is_dataclass(val)
@@ -172,7 +202,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             # assert dataclass_type is not None
 
             final_resolved_val: dict[str, Any] = {}
-            if path_val is not notfilled:
+            if not is_notfilled(path_val):
                 assert isinstance(
                     path_val, str
                 ), f"path_val must be a str, got {type(path_val)}"
@@ -187,8 +217,9 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                     final_resolved_val, resolved_val
                 )
 
-            if val is not notfilled:
+            if not is_notfilled(val):
                 if is_dataclass(val):
+
                     dataclass_type_list = extract_union_types(base_field_type)
 
                     for dataclass_type in dataclass_type_list:
@@ -219,6 +250,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                             dataclass_type, type
                         ):
                             try:
+
                                 resolved_val_temp = asdict(
                                     resolve_yaml_file_to_base_dataclass(
                                         yaml_path=val.get_yaml_file_path(),
@@ -226,9 +258,11 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                                         raise_error_with_nones=raise_error_with_notfilled,
                                     )
                                 )
+
                                 _ = from_dict(
                                     data_class=dataclass_type, data=resolved_val_temp
                                 )
+
                                 resolved_val = resolved_val_temp
                             except Exception:
                                 parsley_logger.debug(
@@ -240,7 +274,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
                     final_resolved_val, resolved_val
                 )
 
-            if overwrite_val is not notfilled:
+            if not is_notfilled(overwrite_val):
                 assert is_dataclass(overwrite_val)
                 dataclass_type_list = extract_union_types(base_field_type)
                 for dataclass_type in dataclass_type_list:
@@ -279,7 +313,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             resolved_data[field.name] = final_resolved_val
 
         else:
-            assert val is not notfilled or not raise_error_with_notfilled
+            assert not is_notfilled(val) or not raise_error_with_notfilled
             resolved_data[field.name] = val
 
     return resolved_data

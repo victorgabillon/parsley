@@ -37,9 +37,10 @@ def test_overwrite_2():
     parsley = create_parsley(
         should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass2
     )
-    args = parsley.parse_arguments(config_file_path="tests_parsley/yaml_files/test_conf_2.yaml")
+    args = parsley.parse_arguments(
+        config_file_path="tests_parsley/yaml_files/test_conf_2.yaml"
+    )
 
-    print("args", args)
     assert args == TestDataClass2(first_attribute_o=TestDataClass(first_attribute=9))
 
 
@@ -48,9 +49,10 @@ def test_overwrite_3():
     parsley = create_parsley(
         should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass3
     )
-    args = parsley.parse_arguments(config_file_path="tests_parsley/yaml_files/test_conf_3.yaml")
+    args = parsley.parse_arguments(
+        config_file_path="tests_parsley/yaml_files/test_conf_3.yaml"
+    )
 
-    print("args", args)
     assert args == TestDataClass3(
         first_attribute_o=TestDataClass4(
             first_attribute=11, second_attribute="defaultxx"

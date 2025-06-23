@@ -51,7 +51,12 @@ def test_cli_nested_dict_output():
     )
 
     args = parsley.parse_command_line_arguments(
-        args=["--config_file_name", "tests_parsley/yaml_files/test_conf_2.yaml", "--gg", "5"]
+        args=[
+            "--config_file_name",
+            "tests_parsley/yaml_files/test_conf_2.yaml",
+            "--gg",
+            "5",
+        ]
     )
 
     assert args == {"config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml"}
@@ -63,10 +68,18 @@ def test_cli_nested_dict_output_2():
     )
 
     args = parsley.parse_command_line_arguments(
-        args=["--config_file_name", "tests_parsley/yaml_files/test_conf_2.yaml", "--a", "5"]
+        args=[
+            "--config_file_name",
+            "tests_parsley/yaml_files/test_conf_2.yaml",
+            "--a",
+            "5",
+        ]
     )
 
-    assert args == {"config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml", "a": 5}
+    assert args == {
+        "config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml",
+        "a": 5,
+    }
 
 
 def test_cli_nested_dict_output_3():
@@ -132,7 +145,6 @@ def test_cli_nested_dict_output_5():
             "hellii",
         ]
     )
-    print("args debu", args)
 
     assert args == {
         "config_file_name": "tests_parsley/yaml_files/test_conf_2.yaml",

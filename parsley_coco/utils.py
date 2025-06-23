@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from re import sub
 import types  # Import types to handle new-style Union
-from dataclasses import fields
+from dataclasses import fields, field
 from dataclasses import is_dataclass
 from types import UnionType
 from typing import Any, Type, Union, get_args, get_origin
@@ -14,7 +14,7 @@ from dacite import from_dict, Config, UnionMatchError
 import argparse
 from typing import cast
 
-from parsley_coco.sentinels import notfilled
+from parsley_coco.sentinels import notfilled, is_notfilled
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
@@ -131,18 +131,18 @@ def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
 
     hints = get_type_hints(cls)
 
-    for field in fields(cls):
-        field_type = hints.get(field.name, field.type)
+    for field_ in fields(cls):
+        field_type = hints.get(field_.name, field_.type)
         type_str = get_pretty_type(field_type)
         # Include default value if available
-        if field.default is not MISSING:
-            default_str = f" = {field.default!r}"
-        elif field.default_factory is not MISSING:
+        if field_.default is not MISSING:
+            default_str = f" = {field_.default!r}"
+        elif field_.default_factory is not MISSING:
             default_str = " = <factory>"
         else:
             default_str = ""
 
-        print(f"{prefix}  - {field.name}: {type_str}{default_str}")
+        print(f"{prefix}  - {field_.name}: {type_str}{default_str}")
 
         # Recurse into nested dataclasses
         for sub_type in extract_dataclass_types(field_type):
@@ -232,10 +232,10 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
         elif is_dataclass(data_class):
             print(f"Handling dataclass: {data_class.__name__}")
             field_errors = []
-            for field in data_class.__annotations__:
-                field_type = data_class.__annotations__[field]
+            for field_ in data_class.__annotations__:
+                field_type = data_class.__annotations__[field_]
                 print(
-                    f"Processing field: {field} of type {field_type}, is"
+                    f"Processing field: {field_} of type {field_type}, is"
                     f" Union: {get_origin(field_type) in {Union, types.UnionType}}"
                 )
                 if get_origin(field_type) in {
@@ -250,7 +250,7 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                             # Try parsing with each type in the Union
                             print(f"Trying to parse with union type: {union_type}")
                             _ = from_dict_with_union_handling(
-                                union_type, data[field], config
+                                union_type, data[field_], config
                             )
                         except Exception as inner_error:
                             # Collect errors for debugging
@@ -260,21 +260,21 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                     error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
                     error_message += "\n".join(errors)
 
-                # Check if the field is a nested dataclass
+                # Check if the field_ is a nested dataclass
                 elif is_dataclass(field_type):
                     try:
-                        value = data[field]
+                        value = data[field_]
                         # Only re-parse if the value is a dict (raw data), not an already-parsed instance
                         if isinstance(value, Mapping):
                             print(
-                                f"Recursively parsing nested dataclass field '{field}'"
+                                f"Recursively parsing nested dataclass field_ '{field_}'"
                             )
-                            data[field] = from_dict_with_union_handling(
+                            data[field_] = from_dict_with_union_handling(
                                 cast(type, field_type), dict(value), config
                             )
                     except Exception as inner_error:
                         field_errors.append(
-                            f"Failed to parse nested dataclass field '{field}': {inner_error}"
+                            f"Failed to parse nested dataclass field_ '{field_}': {inner_error}"
                         )
             if field_errors:
                 raise Exception("\n".join(field_errors)) from None
@@ -317,9 +317,8 @@ def remove_notfilled_values(d: dict[Any, Any]) -> dict[Any, Any]:
             nested = remove_notfilled_values(v)
             if nested:  # Only keep non-empty dicts
                 result[k] = nested
-        elif v is not notfilled:
+        elif not is_notfilled(v):
             result[k] = v
-
     return result
 
 
@@ -372,11 +371,6 @@ def extend_with_config(cls: Type[Any]) -> Type[Any]:
     # Extract existing fields
     original_fields = [(f.name, f.type) for f in fields(cls)]
     # Add the new one
-    extended_fields = original_fields + [("config_file_name", str)]
+    extended_fields = original_fields + [("config_file_name", str, field(default=None))]
     # Create a new dataclass dynamically
     return make_dataclass(cls.__name__ + "WithConfig", extended_fields, bases=(cls,))
-
-
-class NotFilledType:
-    def __repr__(self) -> str:
-        return "<notfilled>"

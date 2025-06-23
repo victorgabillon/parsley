@@ -18,7 +18,7 @@ from typing import (
 from typing import Callable
 from typing import List, Tuple
 
-from parsley_coco.utils import is_or_contains_dataclass
+from parsley_coco.utils import is_or_contains_dataclass, print_dataclass_schema
 from parsley_coco.sentinels import notfilled, _NotFilled
 
 

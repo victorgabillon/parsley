@@ -25,6 +25,7 @@ from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_extended_dict_to_dict_allow_notfilled,
     resolve_yaml_file_to_base_dataclass,
     resolve_extended_object_to_dict,
+    resolve_yaml_file_to_dict_allow_notfilled,
 )
 from parsley_coco.utils import (
     extend_with_config,
@@ -133,16 +134,27 @@ class Parsley[T_Dataclass: IsDataclass]:
         try:
             with open(config_file_path, "r", encoding="utf-8") as _:
                 try:
-                    # read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
-                    dataclass_from_conf_file: T_Dataclass = (
-                        resolve_yaml_file_to_base_dataclass(
+                    ## read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
+                    # dataclass_from_conf_file: T_Dataclass = (
+                    #    resolve_yaml_file_to_base_dataclass(
+                    #        yaml_path=config_file_path,
+                    #        base_cls=self.args_dataclass_name,
+                    #    )
+                    # )
+
+                    args_config_file: dict[str, Any] = (
+                        resolve_yaml_file_to_dict_allow_notfilled(
                             yaml_path=config_file_path,
                             base_cls=self.args_dataclass_name,
+                            raise_error_with_nones=False,
                         )
                     )
 
-                    # transforming back to dictionary to ease the potential future merges
-                    args_config_file: dict[str, Any] = asdict(dataclass_from_conf_file)
+                    ## transforming back to dictionary to ease the potential future merges
+                    # args_config_file: dict[str, Any] = asdict(dataclass_from_conf_file)
+
+                    args_config_file = remove_notfilled_values(d=args_config_file)
+
                     parsley_logger.info(
                         "Here are the yaml file arguments of the script: %s",
                         args_config_file,
@@ -192,6 +204,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                 ),
                 raise_error_with_notfilled=False,
             )
+
             extra_args_dict = remove_notfilled_values(d=extra_args_dict)
 
         parsley_logger.info("Extra args dict %s", extra_args_dict)
@@ -215,6 +228,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                     f"When dealing with {self.args_dataclass_name}()"
                 ) from exc
         else:
+
             self.parse_config_file_arguments(config_file_path)
         assert self.args_config_file is not None
 
