@@ -1,6 +1,8 @@
 """Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
 
+from hmac import new
 from math import e
+from operator import ne
 import types
 from dataclasses import Field, asdict
 from dataclasses import is_dataclass, fields
@@ -170,6 +172,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     extended_obj: IsDataclass,
     base_cls: Type[T_Dataclass],
     raise_error_with_notfilled: bool = True,
+    history_of_recursive_fields: list[str] | None = None,
 ) -> dict[str, Any]:
     """Resolve an extended object to a dictionary.
     Args:
@@ -190,6 +193,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             base_cls=base_cls,
             raise_error_with_notfilled=raise_error_with_notfilled,
             field=field,
+            history_of_recursive_fields=history_of_recursive_fields,
         )
 
     return resolved_data
@@ -200,8 +204,11 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     field: Field[Any],
     raise_error_with_notfilled: bool = True,
+    history_of_recursive_fields: list[str] | None = None,
 ) -> Any:
 
+    result_val: Any
+    # print('Resolving field:', field.name)
     base_field_type = field.type
     val = getattr(extended_obj, field.name, notfilled)
     path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
@@ -242,16 +249,28 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                 for dataclass_type in dataclass_type_list:
 
                     try:
+                        if history_of_recursive_fields is None:
+                            new_history__of_recursive_fields = [field.name]
+                        else:
+                            new_history__of_recursive_fields = (
+                                history_of_recursive_fields + [field.name]
+                            )
+
                         resolved_val_temp = resolve_extended_object_to_dict(
                             extended_obj=cast(IsDataclass, val),
                             base_cls=resolve_type(dataclass_type),
                             raise_error_with_notfilled=raise_error_with_notfilled,
+                            history_of_recursive_fields=new_history__of_recursive_fields,
                         )
+
+                        resolved_val_temp = remove_notfilled_values(resolved_val_temp)
 
                         _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
                         resolved_val = resolved_val_temp
+                        # print('sucess %s dataclass %s %s', field.name, dataclass_type, history_of_recursive_fields)
 
                     except Exception:
+                        # print('fail %s dataclass %s %s', field.name, dataclass_type, history_of_recursive_fields)
                         parsley_logger.debug(
                             "fail %s dataclass %s %s", field.name, dataclass_type, val
                         )
@@ -277,7 +296,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                         dataclass_type, type
                     ):
                         try:
-
+                            # print('Resolving YAML file for field:', field.name)
                             resolved_val_temp = asdict(
                                 resolve_yaml_file_to_base_dataclass(
                                     yaml_path=val.get_yaml_file_path(),
@@ -293,6 +312,15 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                             parsley_logger.debug(
                                 "fail %s yaml %s %s", field.name, dataclass_type, val
                             )
+                try:
+                    resolved_val
+                except NameError as exc:
+                    print(
+                        f"Variable resolved_val is not defined in field {field} {val}"
+                    )
+                    raise NameError(
+                        f"Variable resolved_val is not defined in field {field}"
+                    ) from exc
                 assert resolved_val is not None
 
             final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
@@ -304,10 +332,18 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
 
                 try:
 
+                    if history_of_recursive_fields is None:
+                        new_history__of_recursive_fields = [field.name]
+                    else:
+                        new_history__of_recursive_fields = (
+                            history_of_recursive_fields + [field.name]
+                        )
+
                     overwrite_resolved_val_temp = resolve_extended_object_to_dict(
                         extended_obj=cast(IsDataclass, overwrite_val),
                         base_cls=make_partial_dataclass_notfilled(dataclass_type),
                         raise_error_with_notfilled=False,
+                        history_of_recursive_fields=new_history__of_recursive_fields,
                     )
 
                     overwrite_resolved_val = remove_notfilled_values(
@@ -334,11 +370,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     f"Exactly one of the fields '{field.name}' or '{field.name}_path_to_yaml_file' must be provided, not neither."
                 )
 
-        return final_resolved_val
+        result_val = final_resolved_val
 
     else:
         assert not is_notfilled(val) or not raise_error_with_notfilled
-        return val
+        result_val = val
+
+    return result_val
 
 
 def resolve_extended_object[T_Dataclass: IsDataclass](
