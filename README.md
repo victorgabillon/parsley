@@ -5,6 +5,7 @@
 [![Formatted with isort](https://img.shields.io/badge/isort-checked-green)](https://pycqa.github.io/isort/index.html)
 [![Linting: pylint](https://img.shields.io/badge/linting-pylint-yellowgreen)](https://github.com/PyCQA/pylint)
 [![Tests](https://github.com/victorgabillon/chipiron/actions/workflows/ci.yaml/badge.svg)](https://github.com/victorgabillon/chipiron/actions)
+<a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
 
 ## Overview
 

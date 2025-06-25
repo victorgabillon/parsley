@@ -29,6 +29,7 @@ import logging
 from dataclasses import Field, fields
 from typing import Any, Type
 
+from parsley_coco.logger import set_verbosity
 
 from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass,
@@ -39,11 +40,14 @@ from parsley_coco.parser import Parsley
 from parsley_coco.utils import IsDataclass, add_arguments_from_dataclass
 from parsley_coco.logger import set_parsley_logger
 
+from parsley_coco.logger import get_parsley_logger
+
 
 def create_parsley[DataclassType: IsDataclass](
     args_dataclass_name: Type[DataclassType],
     should_parse_command_line_arguments: bool = True,
     logger: logging.Logger | None = None,
+    verbosity: int = 0,
 ) -> Parsley[DataclassType]:
     """
     Create an argument parser for command line arguments.
@@ -58,7 +62,9 @@ def create_parsley[DataclassType: IsDataclass](
     """
 
     if logger is not None:
-        set_parsley_logger(logger=logger)
+        set_parsley_logger(new_logger=logger)
+
+    set_verbosity(verbosity)
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser()
 

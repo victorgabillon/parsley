@@ -79,6 +79,13 @@ class TestDataClass3:
     first_attribute: TagsYwo2 | TestDataClassYwo2 | TagsYwo | TestDataClassYwo
 
 
+@dataclass
+class TestDataClass4:
+    """Test dataclass for parsing."""
+
+    first_attribute: Tags | TestDataClass = Tags.tag1
+
+
 def test_creation():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(
@@ -111,8 +118,21 @@ def test_creation_2():
     )
 
 
+def test_creation_3():
+    """Test the creation of the Parsley object."""
+    parsley = create_parsley(
+        should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass4
+    )
+    args = parsley.parse_arguments()
+
+    assert args == TestDataClass4(
+        first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
+    )
+
+
 if __name__ == "__main__":
     test_creation()
     test_creation_2()
+    test_creation_3()
 
     print("Test passed!")

@@ -324,7 +324,8 @@ def remove_notfilled_values(d: dict[Any, Any]) -> dict[Any, Any]:
 
 def resolve_type(typ: Any) -> Any:
     origin = get_origin(typ)
-    if origin is Union:
+
+    if origin in (Union, UnionType):
         args = [
             arg for arg in get_args(typ) if arg not in (type(None), type(notfilled))
         ]

@@ -5,20 +5,31 @@
 
 import logging
 
-# Initialize the default logger
+
+# Setup shared logger and proxy
 parsley_logger = logging.getLogger("parsley_app")
-parsley_logger.setLevel(logging.DEBUG)
+parsley_logger.setLevel(logging.INFO)
+
 
 if not parsley_logger.handlers:
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler()
     formatter = logging.Formatter("[%(levelname)s] %(message)s")
-    console_handler.setFormatter(formatter)
-    parsley_logger.addHandler(console_handler)
+    handler.setFormatter(formatter)
+    parsley_logger.addHandler(handler)
     parsley_logger.propagate = False
 
 
-def set_parsley_logger(logger: logging.Logger) -> None:
-    """Allow external injection of a logger."""
+def get_parsley_logger() -> logging.Logger:
+    return parsley_logger
+
+
+def set_parsley_logger(new_logger: logging.Logger) -> None:
     global parsley_logger
-    parsley_logger = logger
+    parsley_logger = new_logger
+
+
+def set_verbosity(level: int) -> None:
+    parsley_logger = get_parsley_logger()
+    parsley_logger.setLevel(level)
+    for handler in parsley_logger.handlers:
+        handler.setLevel(level)

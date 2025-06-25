@@ -7,6 +7,8 @@ Classes:
 
 """
 
+import logging
+
 import os
 from dataclasses import asdict
 from enum import Enum
@@ -19,7 +21,6 @@ from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass,
     make_partial_dataclass_with_optional_paths,
 )
-from parsley_coco.logger import parsley_logger
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_dict_to_base_dataclass,
     resolve_extended_dict_to_dict_allow_notfilled,
@@ -35,6 +36,11 @@ from parsley_coco.utils import (
     remove_none,
     merge_nested_dicts,
 )
+
+
+from parsley_coco.logger import get_parsley_logger, set_verbosity
+
+parsley_logger = get_parsley_logger()
 
 
 class Parsley[T_Dataclass: IsDataclass]:
@@ -197,6 +203,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         if extra_args is None:
             extra_args_dict = {}
         else:
+
             extra_args_dict = resolve_extended_object_to_dict(
                 extended_obj=extra_args,
                 base_cls=make_partial_dataclass_with_optional_paths(
@@ -207,10 +214,9 @@ class Parsley[T_Dataclass: IsDataclass]:
 
             extra_args_dict = remove_notfilled_values(d=extra_args_dict)
 
-        parsley_logger.info("Extra args dict %s", extra_args_dict)
-
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
+
         first_merged_args = merge_nested_dicts(args_command_line, extra_args_dict)
 
         # 'config_file_name' is a specific input that can be specified either in extra_args or in the command line
@@ -240,6 +246,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         assert self.merged_args is not None
 
         parsley_logger.info("Merged args %s", self.merged_args)
+
         # Converting the args in the standardized dataclass
         dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
@@ -247,7 +254,23 @@ class Parsley[T_Dataclass: IsDataclass]:
             config=dacite.Config(cast=[Enum]),
         )
 
-        return dataclass_args
+        # passing one more time in the machine as we may still have some unresolved tags due to default values
+        new_dict = resolve_extended_dict_to_dict_allow_notfilled(
+            dicto=asdict(dataclass_args),
+            base_cls=self.args_dataclass_name,
+            raise_error_with_nones=False,
+        )
+        new_dict = remove_notfilled_values(new_dict)
+        parsley_logger.info("Final Merged args %s", new_dict)
+
+        # Converting the args in the standardized dataclass
+        dataclass_args_final: T_Dataclass = dacite.from_dict(
+            data_class=self.args_dataclass_name,
+            data=new_dict,
+            config=dacite.Config(cast=[Enum]),
+        )
+
+        return dataclass_args_final
 
     def parse_arguments(
         self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
@@ -262,6 +285,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         Returns:
             dict[str, Any]: A dictionary containing the merged arguments.
         """
+
         args_command_line: dict[str, Any]
         if self.should_parse_command_line_arguments:
             args_command_line = self.parse_command_line_arguments()

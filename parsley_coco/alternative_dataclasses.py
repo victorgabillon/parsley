@@ -86,26 +86,38 @@ def make_dataclass_with_optional_paths_and_overwrite(
         )
 
         if is_or_contains_dataclass(original_type):
-            optional_fields.append(
-                (f.name, Optional[transformed_type], field(default=None))
-            )
-            optional_fields.append(
-                (f"{f.name}_path_to_yaml_file", Optional[str], field(default=None))
-            )
-            optional_fields.append(
-                (f"{f.name}_overwrite", Optional[transformed_type], field(default=None))
-            )
+            if all(f.name != existing[0] for existing in optional_fields):
+                optional_fields.append(
+                    (f.name, Optional[transformed_type], field(default=None))
+                )
+                optional_fields.append(
+                    (f"{f.name}_path_to_yaml_file", Optional[str], field(default=None))
+                )
+                optional_fields.append(
+                    (
+                        f"{f.name}_overwrite",
+                        Optional[transformed_type],
+                        field(default=None),
+                    )
+                )
         else:
             if f.default is not MISSING:
-                optional_fields.append(
-                    (f.name, transformed_type, field(default=f.default))
-                )
+                if all(f.name != existing[0] for existing in optional_fields):
+                    optional_fields.append(
+                        (f.name, transformed_type, field(default=f.default))
+                    )
             elif f.default_factory is not MISSING:
-                optional_fields.append(
-                    (f.name, transformed_type, field(default_factory=f.default_factory))
-                )
+                if all(f.name != existing[0] for existing in optional_fields):
+                    optional_fields.append(
+                        (
+                            f.name,
+                            transformed_type,
+                            field(default_factory=f.default_factory),
+                        )
+                    )
             else:
-                required_fields.append((f.name, transformed_type, field()))
+                if all(f.name != existing[0] for existing in required_fields):
+                    required_fields.append((f.name, transformed_type, field()))
 
     new_cls_name = cls.__name__ + "_WithOptionalPath"
     new_cls = make_dataclass(new_cls_name, required_fields + optional_fields)
@@ -235,7 +247,9 @@ def make_partial_dataclass_with_optional_paths(cls: Type[Any]) -> Type[Any]:
     Raises:
         ValueError: If the provided class is not a dataclass.
     """
+
     optional_paths_class = make_dataclass_with_optional_paths_and_overwrite(cls=cls)
+
     partial_with_optional_paths_class = make_partial_dataclass_notfilled(
         cls=optional_paths_class
     )

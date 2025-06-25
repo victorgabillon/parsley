@@ -1,7 +1,8 @@
 """Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
 
+from math import e
 import types
-from dataclasses import asdict
+from dataclasses import Field, asdict
 from dataclasses import is_dataclass, fields
 from enum import Enum
 from typing import Any, Type
@@ -30,9 +31,12 @@ from parsley_coco.utils import (
     remove_notfilled_values,
     resolve_type,
 )
-from parsley_coco.logger import parsley_logger
+from parsley_coco.logger import get_parsley_logger
 
 from parsley_coco.sentinels import is_notfilled, notfilled
+
+
+parsley_logger = get_parsley_logger()
 
 
 def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
@@ -81,12 +85,12 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     Raises:
         Exception: If the YAML file cannot be read.
     """
+
     extended_cls = make_partial_dataclass_with_optional_paths(base_cls)
 
     extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
-
     resolve_extended_object_ = resolve_extended_object(
         extended_obj, base_cls, raise_error_with_nones=raise_error_with_nones
     )
@@ -112,7 +116,6 @@ def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
         with open(yaml_path, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
-        print(f" debug Error reading file {yaml_path}: {exc}")
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
     return resolve_extended_dict_to_dict_allow_notfilled(
@@ -140,7 +143,6 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
         with open(yaml_path, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
-        print(f" debug Error reading file {yaml_path}: {exc}")
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
     return resolve_dict_to_base_dataclass(
@@ -183,140 +185,160 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     resolved_data: dict[str, Any] = {}
 
     for field in fields(base_cls):
-
-        base_field_type = field.type
-        val = getattr(extended_obj, field.name, notfilled)
-        path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
-        overwrite_val = getattr(extended_obj, f"{field.name}_overwrite", notfilled)
-
-        # assert isinstance(base_field_type, type)
-        value_base: bool = not is_notfilled(val)
-        value_base = (
-            value_base
-            and not is_dataclass(val)
-            and not hasattr(val, "get_yaml_file_path")
+        resolved_data[field.name] = resolve_extended_object_to_dict_one_field(
+            extended_obj=extended_obj,
+            base_cls=base_cls,
+            raise_error_with_notfilled=raise_error_with_notfilled,
+            field=field,
         )
 
-        if is_or_contains_dataclass(base_field_type) and not value_base:
+    return resolved_data
 
-            # assert dataclass_type is not None
 
-            final_resolved_val: dict[str, Any] = {}
-            if not is_notfilled(path_val):
-                assert isinstance(
-                    path_val, str
-                ), f"path_val must be a str, got {type(path_val)}"
-                resolved_val = asdict(
-                    resolve_yaml_file_to_base_dataclass(
-                        yaml_path=path_val,
-                        base_cls=resolve_type(base_field_type),
-                        raise_error_with_nones=raise_error_with_notfilled,
+def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
+    extended_obj: IsDataclass,
+    base_cls: Type[T_Dataclass],
+    field: Field[Any],
+    raise_error_with_notfilled: bool = True,
+) -> Any:
+
+    base_field_type = field.type
+    val = getattr(extended_obj, field.name, notfilled)
+    path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
+    overwrite_val = getattr(extended_obj, f"{field.name}_overwrite", notfilled)
+
+    # assert isinstance(base_field_type, type)
+    value_base: bool = not is_notfilled(val)
+    value_base = (
+        value_base and not is_dataclass(val) and not hasattr(val, "get_yaml_file_path")
+    )
+
+    if is_or_contains_dataclass(base_field_type) and not value_base:
+
+        # assert dataclass_type is not None
+
+        final_resolved_val: dict[str, Any] = {}
+        if not is_notfilled(path_val):
+
+            assert isinstance(
+                path_val, str
+            ), f"path_val must be a str, got {type(path_val)}"
+            resolved_val = asdict(
+                resolve_yaml_file_to_base_dataclass(
+                    yaml_path=path_val,
+                    base_cls=resolve_type(base_field_type),
+                    raise_error_with_nones=raise_error_with_notfilled,
+                )
+            )
+
+            final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
+
+        if not is_notfilled(val):
+
+            if is_dataclass(val):
+
+                dataclass_type_list = extract_union_types(base_field_type)
+
+                for dataclass_type in dataclass_type_list:
+
+                    try:
+                        resolved_val_temp = resolve_extended_object_to_dict(
+                            extended_obj=cast(IsDataclass, val),
+                            base_cls=resolve_type(dataclass_type),
+                            raise_error_with_notfilled=raise_error_with_notfilled,
+                        )
+
+                        _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
+                        resolved_val = resolved_val_temp
+
+                    except Exception:
+                        parsley_logger.debug(
+                            "fail %s dataclass %s %s", field.name, dataclass_type, val
+                        )
+                try:
+                    resolved_val
+                except NameError as exc:
+                    print(
+                        f"Variable resolved_val is not defined in field {field} {val}"
                     )
-                )
-                final_resolved_val = merge_nested_dicts(
-                    final_resolved_val, resolved_val
-                )
+                    raise NameError(
+                        f"Variable resolved_val is not defined in field {field}"
+                    ) from exc
 
-            if not is_notfilled(val):
-                if is_dataclass(val):
+                assert (
+                    resolved_val is not None
+                ), f"resolved_val is None in field {field}"
+            else:  # Non-dataclass value in a Union — allowed
 
-                    dataclass_type_list = extract_union_types(base_field_type)
-
-                    for dataclass_type in dataclass_type_list:
-
+                assert hasattr(val, "get_yaml_file_path")
+                dataclass_type_list = extract_union_types(base_field_type)
+                for dataclass_type in dataclass_type_list:
+                    if is_dataclass(dataclass_type) and isinstance(
+                        dataclass_type, type
+                    ):
                         try:
-                            resolved_val_temp = resolve_extended_object_to_dict(
-                                extended_obj=cast(IsDataclass, val),
-                                base_cls=resolve_type(dataclass_type),
-                                raise_error_with_notfilled=raise_error_with_notfilled,
-                            )
 
+                            resolved_val_temp = asdict(
+                                resolve_yaml_file_to_base_dataclass(
+                                    yaml_path=val.get_yaml_file_path(),
+                                    base_cls=resolve_type(dataclass_type),
+                                    raise_error_with_nones=raise_error_with_notfilled,
+                                )
+                            )
                             _ = from_dict(
                                 data_class=dataclass_type, data=resolved_val_temp
                             )
                             resolved_val = resolved_val_temp
-
                         except Exception:
                             parsley_logger.debug(
-                                f"fail {field.name} dataclass", dataclass_type, val
+                                "fail %s yaml %s %s", field.name, dataclass_type, val
                             )
-                    assert resolved_val is not None
-                else:  # Non-dataclass value in a Union — allowed
+                assert resolved_val is not None
 
-                    assert hasattr(val, "get_yaml_file_path")
-                    dataclass_type_list = extract_union_types(base_field_type)
-                    for dataclass_type in dataclass_type_list:
-                        if is_dataclass(dataclass_type) and isinstance(
-                            dataclass_type, type
-                        ):
-                            try:
+            final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
 
-                                resolved_val_temp = asdict(
-                                    resolve_yaml_file_to_base_dataclass(
-                                        yaml_path=val.get_yaml_file_path(),
-                                        base_cls=resolve_type(dataclass_type),
-                                        raise_error_with_nones=raise_error_with_notfilled,
-                                    )
-                                )
+        if not is_notfilled(overwrite_val):
+            assert is_dataclass(overwrite_val)
+            dataclass_type_list = extract_union_types(base_field_type)
+            for dataclass_type in dataclass_type_list:
 
-                                _ = from_dict(
-                                    data_class=dataclass_type, data=resolved_val_temp
-                                )
+                try:
 
-                                resolved_val = resolved_val_temp
-                            except Exception:
-                                parsley_logger.debug(
-                                    f"fail {field.name} yaml", dataclass_type, val
-                                )
-                    assert resolved_val is not None
-
-                final_resolved_val = merge_nested_dicts(
-                    final_resolved_val, resolved_val
-                )
-
-            if not is_notfilled(overwrite_val):
-                assert is_dataclass(overwrite_val)
-                dataclass_type_list = extract_union_types(base_field_type)
-                for dataclass_type in dataclass_type_list:
-
-                    try:
-
-                        overwrite_resolved_val_temp = resolve_extended_object_to_dict(
-                            extended_obj=cast(IsDataclass, overwrite_val),
-                            base_cls=make_partial_dataclass_notfilled(dataclass_type),
-                            raise_error_with_notfilled=False,
-                        )
-
-                        overwrite_resolved_val = remove_notfilled_values(
-                            overwrite_resolved_val_temp
-                        )
-
-                    except Exception:
-                        parsley_logger.debug(
-                            f"fail {field.name} overwrite",
-                            dataclass_type,
-                            overwrite_val,
-                        )
-
-                assert overwrite_resolved_val is not None
-
-                final_resolved_val = merge_nested_dicts(
-                    final_resolved_val, overwrite_resolved_val
-                )
-
-            if val is notfilled and path_val is notfilled:
-                if raise_error_with_notfilled:
-                    raise ValueError(
-                        f"Exactly one of the fields '{field.name}' or '{field.name}_path_to_yaml_file' must be provided, not neither."
+                    overwrite_resolved_val_temp = resolve_extended_object_to_dict(
+                        extended_obj=cast(IsDataclass, overwrite_val),
+                        base_cls=make_partial_dataclass_notfilled(dataclass_type),
+                        raise_error_with_notfilled=False,
                     )
 
-            resolved_data[field.name] = final_resolved_val
+                    overwrite_resolved_val = remove_notfilled_values(
+                        overwrite_resolved_val_temp
+                    )
 
-        else:
-            assert not is_notfilled(val) or not raise_error_with_notfilled
-            resolved_data[field.name] = val
+                except Exception:
+                    parsley_logger.debug(
+                        "fail %s overwrite %s %s",
+                        field.name,
+                        dataclass_type,
+                        overwrite_val,
+                    )
 
-    return resolved_data
+            assert overwrite_resolved_val is not None
+
+            final_resolved_val = merge_nested_dicts(
+                final_resolved_val, overwrite_resolved_val
+            )
+
+        if val is notfilled and path_val is notfilled:
+            if raise_error_with_notfilled:
+                raise ValueError(
+                    f"Exactly one of the fields '{field.name}' or '{field.name}_path_to_yaml_file' must be provided, not neither."
+                )
+
+        return final_resolved_val
+
+    else:
+        assert not is_notfilled(val) or not raise_error_with_notfilled
+        return val
 
 
 def resolve_extended_object[T_Dataclass: IsDataclass](
@@ -336,6 +358,8 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         base_cls=base_cls,
         raise_error_with_notfilled=raise_error_with_nones,
     )
+
+    resolved_data = remove_notfilled_values(resolved_data)
 
     result = from_dict_with_union_handling(
         data_class=base_cls, data=resolved_data, config=dacite.Config(cast=[Enum])
