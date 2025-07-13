@@ -8,10 +8,10 @@ Classes:
 """
 
 import logging
-
 import os
 from dataclasses import asdict
 from enum import Enum
+from struct import pack
 from typing import Any, Type
 
 import dacite
@@ -21,24 +21,22 @@ from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass,
     make_partial_dataclass_with_optional_paths,
 )
+from parsley_coco.logger import get_parsley_logger, set_verbosity
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_dict_to_base_dataclass,
     resolve_extended_dict_to_dict_allow_notfilled,
-    resolve_yaml_file_to_base_dataclass,
     resolve_extended_object_to_dict,
+    resolve_yaml_file_to_base_dataclass,
     resolve_yaml_file_to_dict_allow_notfilled,
 )
 from parsley_coco.utils import (
+    IsDataclass,
     extend_with_config,
+    merge_nested_dicts,
+    remove_none,
     remove_notfilled_values,
     unflatten,
-    IsDataclass,
-    remove_none,
-    merge_nested_dicts,
 )
-
-
-from parsley_coco.logger import get_parsley_logger, set_verbosity
 
 parsley_logger = get_parsley_logger()
 
@@ -72,12 +70,14 @@ class Parsley[T_Dataclass: IsDataclass]:
     merged_args: dict[str, Any] | None
     should_parse_command_line_arguments: bool = True
     args_dataclass_name: Type[T_Dataclass]
+    package_name: str | None = None
 
     def __init__(
         self,
         parser: Any,
         args_dataclass_name: Type[T_Dataclass],
         should_parse_command_line_arguments: bool = True,
+        package_name: str | None = None,
     ) -> None:
         """
         Initialize the MyParser object.
@@ -90,6 +90,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         self.parser = parser
         self.should_parse_command_line_arguments = should_parse_command_line_arguments
         self.args_dataclass_name = args_dataclass_name
+        self.package_name = package_name
 
         # attributes to be set and saved at runtime
         self.args_config_file = None
@@ -210,6 +211,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                     self.args_dataclass_name
                 ),
                 raise_error_with_notfilled=False,
+                package_name=self.package_name,
             )
 
             extra_args_dict = remove_notfilled_values(d=extra_args_dict)

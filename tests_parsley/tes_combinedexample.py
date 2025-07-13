@@ -1,8 +1,8 @@
+from dataclasses import dataclass
 from re import L
 from typing import Literal
-from parsley_coco import create_parsley
 
-from dataclasses import dataclass
+from parsley_coco import create_parsley
 
 
 @dataclass

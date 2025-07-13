@@ -1,10 +1,12 @@
 import os
 import tempfile
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Literal, Optional, Union
+
 import dacite
 import yaml
-from dataclasses import dataclass, field
-from typing import Union, Literal, Optional
-from enum import Enum
+
 from parsley_coco import create_parsley
 from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass_with_optional_paths,

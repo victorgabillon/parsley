@@ -1,16 +1,15 @@
 import logging
-from click import command
-from parsley_coco import create_parsley, Parsley
-
 from dataclasses import dataclass
+from enum import Enum
+from typing import Literal
 
+from click import command
+
+from parsley_coco import Parsley, create_parsley
 from parsley_coco.alternative_dataclasses import (
     make_dataclass_with_optional_paths_and_overwrite,
     make_partial_dataclass_with_optional_paths,
 )
-
-from typing import Literal
-from enum import Enum
 
 
 @dataclass
@@ -35,7 +34,8 @@ def test_base():
 
 
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
+
+from parsley_coco import Parsley, create_parsley
 from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass_with_optional_paths,
 )

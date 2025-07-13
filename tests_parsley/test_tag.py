@@ -1,9 +1,9 @@
 import dis
-from typing import Literal
-from parsley_coco import create_parsley
-
 from dataclasses import dataclass
 from enum import Enum
+from typing import Literal
+
+from parsley_coco import create_parsley
 
 
 class Tags(str, Enum):

@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 
-
-from parsley_coco import create_parsley, Parsley
+from parsley_coco import Parsley, create_parsley
 
 
 @dataclass

@@ -1,20 +1,26 @@
 """Utility functions for various operations."""
 
-from collections.abc import Mapping
-from re import sub
-import types  # Import types to handle new-style Union
-from dataclasses import fields, field
-from dataclasses import is_dataclass
-from types import UnionType
-from typing import Any, Type, Union, get_args, get_origin
-from typing import ClassVar, Protocol
-from typing import get_type_hints
-from dataclasses import MISSING, make_dataclass, dataclass
-from dacite import from_dict, Config, UnionMatchError
 import argparse
-from typing import cast
+import types  # Import types to handle new-style Union
+from collections.abc import Mapping
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass, make_dataclass
+from re import sub
+from types import UnionType
+from typing import (
+    Any,
+    ClassVar,
+    Protocol,
+    Type,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
-from parsley_coco.sentinels import notfilled, is_notfilled
+from dacite import Config, UnionMatchError, from_dict
+
+from parsley_coco.sentinels import is_notfilled, notfilled
 
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:

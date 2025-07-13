@@ -1,15 +1,15 @@
 """Resolve a YAML file to a dataclass object with optional paths and overwrite fields."""
 
+import os
+import types
+from dataclasses import Field, asdict, fields, is_dataclass
+from enum import Enum
 from hmac import new
 from math import e
 from operator import ne
-import types
-from dataclasses import Field, asdict
-from dataclasses import is_dataclass, fields
-from enum import Enum
-from typing import Any, Type
-from typing import Union, get_origin, get_args
-from typing import cast
+from pathlib import Path
+from struct import pack
+from typing import Any, Optional, Type, Union, cast, get_args, get_origin
 
 import dacite
 import yaml
@@ -21,24 +21,56 @@ from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass_notfilled,
     make_partial_dataclass_with_optional_paths,
 )
+from parsley_coco.logger import get_parsley_logger
+from parsley_coco.sentinels import is_notfilled, notfilled
 from parsley_coco.utils import (
     IsDataclass,
+    extract_union_types,
+    from_dict_with_union_handling,
+    is_optional_type,
     is_or_contains_dataclass,
     merge_nested_dicts,
-    is_optional_type,
-    from_dict_with_union_handling,
-    extract_union_types,
     print_dataclass_schema,
     remove_none_values,
     remove_notfilled_values,
     resolve_type,
 )
-from parsley_coco.logger import get_parsley_logger
-
-from parsley_coco.sentinels import is_notfilled, notfilled
-
 
 parsley_logger = get_parsley_logger()
+
+
+def resolve_package_path(
+    path: Union[str, Path], package_root: Optional[str] = None
+) -> str:
+    """
+    Replace 'package://' at the start of the path with the given package root.
+
+    Args:
+        path (str): The input path, possibly starting with 'package://'.
+        package_root (Optional[str]): The base path to replace 'package://' with.
+
+    Returns:
+        str: The resolved path.
+
+    Raises:
+        ValueError: If path starts with 'package://' and package_root is None.
+    """
+    path = str(path)  # Ensure path is a string
+
+    if path.startswith("package://"):
+        print("debug OOPACKAGE NAME:", package_root, path)
+        if package_root is None:
+            raise ValueError(
+                f"'package://' path used ({path}), but no package_root was provided."
+            )
+        relative_path = path[len("package://") :]
+        print(
+            "IIIdebug relative_path:",
+            relative_path,
+            os.path.join(package_root, relative_path),
+        )
+        return os.path.join(package_root, relative_path)
+    return path
 
 
 def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
@@ -76,6 +108,7 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     dicto: dict[str, Any],
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
+    package_name: str | None = None,
 ) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -94,14 +127,20 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
     resolve_extended_object_ = resolve_extended_object(
-        extended_obj, base_cls, raise_error_with_nones=raise_error_with_nones
+        extended_obj,
+        base_cls,
+        raise_error_with_nones=raise_error_with_nones,
+        package_name=package_name,
     )
 
     return resolve_extended_object_
 
 
 def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
-    yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+    yaml_path: str,
+    base_cls: Type[T_Dataclass],
+    raise_error_with_nones: bool = True,
+    package_name: str | None = None,
 ) -> dict[str, Any]:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -114,8 +153,9 @@ def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
         Exception: If the YAML file cannot be read.
     """
 
+    yaml_path_resolved = resolve_package_path(path=yaml_path, package_root=package_name)
     try:
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path_resolved, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
@@ -128,7 +168,10 @@ def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
 
 
 def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
-    yaml_path: str, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+    yaml_path: str,
+    base_cls: Type[T_Dataclass],
+    raise_error_with_nones: bool = True,
+    package_name: str | None = None,
 ) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -140,9 +183,9 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     Raises:
         Exception: If the YAML file cannot be read.
     """
-
+    yaml_path_resolved = resolve_package_path(path=yaml_path, package_root=package_name)
     try:
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path_resolved, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
@@ -151,6 +194,7 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
         dicto=yaml_data,
         base_cls=base_cls,
         raise_error_with_nones=raise_error_with_nones,
+        package_name=package_name,
     )
 
 
@@ -173,6 +217,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
+    package_name: str | None = None,
 ) -> dict[str, Any]:
     """Resolve an extended object to a dictionary.
     Args:
@@ -194,6 +239,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             raise_error_with_notfilled=raise_error_with_notfilled,
             field=field,
             history_of_recursive_fields=history_of_recursive_fields,
+            package_name=package_name,
         )
 
     return resolved_data
@@ -205,6 +251,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     field: Field[Any],
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
+    package_name: str | None = None,
 ) -> Any:
 
     result_val: Any
@@ -235,6 +282,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     yaml_path=path_val,
                     base_cls=resolve_type(base_field_type),
                     raise_error_with_nones=raise_error_with_notfilled,
+                    package_name=package_name,
                 )
             )
 
@@ -261,6 +309,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                             base_cls=resolve_type(dataclass_type),
                             raise_error_with_notfilled=raise_error_with_notfilled,
                             history_of_recursive_fields=new_history__of_recursive_fields,
+                            package_name=package_name,
                         )
 
                         resolved_val_temp = remove_notfilled_values(resolved_val_temp)
@@ -278,10 +327,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     resolved_val
                 except NameError as exc:
                     print(
-                        f"Variable resolved_val is not defined in field {field} {val}"
+                        f"Variable (print) resolved_val is not defined in field {field} {val}"
                     )
+                    import traceback
+
+                    traceback.print_exc()  # <-- This prints the full traceback
                     raise NameError(
-                        f"Variable resolved_val is not defined in field {field}"
+                        f"Variable resolved_val is not defined in field {field} with value {val}"
                     ) from exc
 
                 assert (
@@ -297,11 +349,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     ):
                         try:
                             # print('Resolving YAML file for field:', field.name)
+                            print("debug PACKAGE NAME:", package_name)
                             resolved_val_temp = asdict(
                                 resolve_yaml_file_to_base_dataclass(
                                     yaml_path=val.get_yaml_file_path(),
                                     base_cls=resolve_type(dataclass_type),
                                     raise_error_with_nones=raise_error_with_notfilled,
+                                    package_name=package_name,
                                 )
                             )
                             _ = from_dict(
@@ -344,6 +398,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                         base_cls=make_partial_dataclass_notfilled(dataclass_type),
                         raise_error_with_notfilled=False,
                         history_of_recursive_fields=new_history__of_recursive_fields,
+                        package_name=package_name,
                     )
 
                     overwrite_resolved_val = remove_notfilled_values(
@@ -380,7 +435,10 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
 
 
 def resolve_extended_object[T_Dataclass: IsDataclass](
-    extended_obj: Any, base_cls: Type[T_Dataclass], raise_error_with_nones: bool = True
+    extended_obj: Any,
+    base_cls: Type[T_Dataclass],
+    raise_error_with_nones: bool = True,
+    package_name: str | None = None,
 ) -> T_Dataclass:
     """Resolve an extended object to a dataclass object.
     Args:
@@ -395,6 +453,7 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         extended_obj=extended_obj,
         base_cls=base_cls,
         raise_error_with_notfilled=raise_error_with_nones,
+        package_name=package_name,
     )
 
     resolved_data = remove_notfilled_values(resolved_data)

@@ -1,7 +1,6 @@
-from parsley_coco import create_parsley
-
 from dataclasses import dataclass, field
 
+from parsley_coco import create_parsley
 from parsley_coco.alternative_dataclasses import (
     make_partial_dataclass_with_optional_paths,
 )

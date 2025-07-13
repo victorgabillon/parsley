@@ -5,7 +5,6 @@
 
 import logging
 
-
 # Setup shared logger and proxy
 parsley_logger = logging.getLogger("parsley_app")
 parsley_logger.setLevel(logging.INFO)

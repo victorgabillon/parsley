@@ -1,6 +1,6 @@
-from parsley_coco import create_parsley
-
 from dataclasses import dataclass
+
+from parsley_coco import create_parsley
 
 
 @dataclass
