@@ -536,6 +536,69 @@ Config(x=20, y="hello", nested_config=NestedConfig(z=100))
 ```
 
 ---
+### Using `package_name` for Package-Relative YAML Paths
+
+Parsley Coco supports resolving YAML file paths that start with `package://` by allowing you to specify a `package_name` (or package root path) in several functions, such as `parse_arguments`, `resolve_yaml_file_to_base_dataclass`, and related utilities. This enables you to reference data files within a package using a consistent, package-relative syntax.
+
+#### Why Use `package_name`?
+
+When developing a Python package that includes internal YAML configuration files, you may want to reference those files using paths like `package://data/config.yaml`. This is especially useful when your package is imported and used by another script or project, and you want to ensure that YAML file paths are resolved relative to the package’s location, not the caller’s working directory.
+
+#### Example Scenario
+
+Suppose you have a package `my_package` with the following structure:
+
+```
+my_package/
+  data/
+    config.yaml
+  main.py
+```
+
+And your YAML file references another YAML file using a package-relative path:
+
+```yaml
+# config.yaml
+nested_config_path_to_yaml_file: "package://data/nested.yaml"
+```
+
+#### Code Example
+
+```python
+from parsley_coco import create_parsley, Parsley
+
+@dataclass
+class NestedConfig:
+    z: int
+
+@dataclass
+class Config:
+    x: int
+    y: str
+    nested_config: NestedConfig
+
+parser: Parsley[Config] = create_parsley(Config)
+
+# Suppose your package root is '/home/user/my_package'
+config = parser.parse_arguments(
+    config_file_path="/home/user/my_package/data/config.yaml",
+    package_name="/home/user/my_package"
+)
+print(config)
+```
+
+In this example:
+- Any YAML path in your config that starts with `package://` will be resolved relative to `/home/user/my_package`.
+- For instance, `package://data/nested.yaml` becomes `/home/user/my_package/data/nested.yaml`.
+
+#### When Is This Needed?
+
+- **Package Internal Data**: When your package ships with YAML data files and you want to reference them reliably.
+- **Imported Usage**: When your package is imported by another script, and you want YAML references to resolve to your package’s data, not the importing script’s directory.
+- **Portability**: Ensures that YAML references work regardless of where or how your package is used.
+
+**Tip:**
+Always use the `package_name` argument when you expect to resolve `package://` paths, especially in reusable libraries or packages.
 
 ### Key Points
 
