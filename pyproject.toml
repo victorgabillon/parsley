@@ -26,12 +26,14 @@ dependencies = [
 test = ["pytest>=7.0","types-PyYAML"]
 
 [tool.setuptools]
-packages = ["parsley_coco"]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
 
 
 [tool.setuptools.package-data]
-chipiron = [
+parsley_coco = [
   "data/**/*.yaml",
 ]
 
@@ -48,3 +50,18 @@ testpaths = [
     "parsley_coco",
     "tests_parsley"
 ]
+
+
+[tool.black]
+target-version = ["py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''

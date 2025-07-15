@@ -58,17 +58,11 @@ def resolve_package_path(
     path = str(path)  # Ensure path is a string
 
     if path.startswith("package://"):
-        print("debug OOPACKAGE NAME:", package_root, path)
         if package_root is None:
             raise ValueError(
                 f"'package://' path used ({path}), but no package_root was provided."
             )
         relative_path = path[len("package://") :]
-        print(
-            "IIIdebug relative_path:",
-            relative_path,
-            os.path.join(package_root, relative_path),
-        )
         return os.path.join(package_root, relative_path)
     return path
 
