@@ -3,13 +3,23 @@
 import argparse
 import types  # Import types to handle new-style Union
 from collections.abc import Mapping
-from dataclasses import MISSING, dataclass, field, fields, is_dataclass, make_dataclass
+from dataclasses import (
+    MISSING,
+    Field,
+    dataclass,
+    field,
+    fields,
+    is_dataclass,
+    make_dataclass,
+)
 from re import sub
 from types import UnionType
 from typing import (
     Any,
     ClassVar,
+    List,
     Protocol,
+    Tuple,
     Type,
     Union,
     cast,
@@ -374,10 +384,41 @@ def add_arguments_from_dataclass(
         )
 
 
+FieldTuple = Union[
+    Tuple[str, Any], Tuple[str, Any, Any]  # (name, type)  # (name, type, field spec)
+]
+
+
 def extend_with_config(cls: Type[Any]) -> Type[Any]:
+
     # Extract existing fields
-    original_fields = [(f.name, f.type) for f in fields(cls)]
+    original_fields: List[FieldTuple] = []
+
+    for f in fields(cls):
+        if f.default is not MISSING or f.default_factory is not MISSING:
+            original_fields.append(
+                (
+                    f.name,
+                    f.type,
+                    (
+                        field(default=f.default)
+                        if f.default is not MISSING
+                        else field(default_factory=f.default_factory)
+                    ),
+                )
+            )
+        else:
+            original_fields.append((f.name, f.type))  # non-default
+
     # Add the new one
-    extended_fields = original_fields + [("config_file_name", str, field(default=None))]
+    non_default_fields = [f for f in original_fields if len(f) == 2]
+    default_fields = [f for f in original_fields if len(f) == 3]
+    extended_fields = (
+        non_default_fields
+        + default_fields
+        + [("config_file_name", str, field(default=None))]
+    )
+
     # Create a new dataclass dynamically
+
     return make_dataclass(cls.__name__ + "WithConfig", extended_fields, bases=(cls,))

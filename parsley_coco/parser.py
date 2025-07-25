@@ -154,6 +154,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                             yaml_path=config_file_path,
                             base_cls=self.args_dataclass_name,
                             raise_error_with_nones=False,
+                            package_name=self.package_name,
                         )
                     )
 
@@ -204,7 +205,6 @@ class Parsley[T_Dataclass: IsDataclass]:
         if extra_args is None:
             extra_args_dict = {}
         else:
-
             extra_args_dict = resolve_extended_object_to_dict(
                 extended_obj=extra_args,
                 base_cls=make_partial_dataclass_with_optional_paths(

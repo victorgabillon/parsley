@@ -6,7 +6,7 @@ from dataclasses import Field, asdict, fields, is_dataclass
 from enum import Enum
 from hmac import new
 from math import e
-from operator import ne
+from operator import le, ne
 from pathlib import Path
 from struct import pack
 from typing import Any, Optional, Type, Union, cast, get_args, get_origin
@@ -59,6 +59,9 @@ def resolve_package_path(
 
     if path.startswith("package://"):
         if package_root is None:
+            parsley_logger.debug(
+                "Path starts with 'package://', but no package_root was provided."
+            )
             raise ValueError(
                 f"'package://' path used ({path}), but no package_root was provided."
             )
@@ -71,6 +74,7 @@ def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
     dicto: dict[str, Any],
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
+    package_name: str | None = None,
 ) -> dict[str, Any]:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -93,6 +97,7 @@ def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
         extended_obj=extended_obj,
         base_cls=make_partial_dataclass_notfilled(base_cls),
         raise_error_with_notfilled=raise_error_with_nones,
+        package_name=package_name,
     )
 
     return resolved_data
@@ -103,6 +108,7 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
+    level_of_recursion: int = 0,
 ) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -125,6 +131,7 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
         base_cls,
         raise_error_with_nones=raise_error_with_nones,
         package_name=package_name,
+        level_of_recursion=level_of_recursion,
     )
 
     return resolve_extended_object_
@@ -158,6 +165,7 @@ def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
         dicto=yaml_data,
         base_cls=base_cls,
         raise_error_with_nones=raise_error_with_nones,
+        package_name=package_name,
     )
 
 
@@ -166,6 +174,7 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
+    level_of_recursion: int = 0,
 ) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
     Args:
@@ -177,11 +186,26 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     Raises:
         Exception: If the YAML file cannot be read.
     """
-    yaml_path_resolved = resolve_package_path(path=yaml_path, package_root=package_name)
+    indent: str = " " * level_of_recursion * 2
+    try:
+        yaml_path_resolved = resolve_package_path(
+            path=yaml_path, package_root=package_name
+        )
+    except ValueError as exc:
+        parsley_logger.debug(
+            "%s%s: Could not resolve package path: %s",
+            indent,
+            level_of_recursion,
+            yaml_path,
+        )
+        raise exc
     try:
         with open(yaml_path_resolved, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
     except IOError as exc:
+        parsley_logger.debug(
+            "%s%s: Could not read file: %s", indent, level_of_recursion, yaml_path
+        )
         raise FileNotFoundError(f"Could not read file: {yaml_path}") from exc
 
     return resolve_dict_to_base_dataclass(
@@ -189,6 +213,7 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
         base_cls=base_cls,
         raise_error_with_nones=raise_error_with_nones,
         package_name=package_name,
+        level_of_recursion=level_of_recursion,
     )
 
 
@@ -212,6 +237,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
     package_name: str | None = None,
+    level_of_recursion: int = 0,
 ) -> dict[str, Any]:
     """Resolve an extended object to a dictionary.
     Args:
@@ -234,6 +260,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             field=field,
             history_of_recursive_fields=history_of_recursive_fields,
             package_name=package_name,
+            level_of_recursion=level_of_recursion,
         )
 
     return resolved_data
@@ -246,10 +273,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
     package_name: str | None = None,
+    level_of_recursion: int = 0,
 ) -> Any:
 
     result_val: Any
-    # print('Resolving field:', field.name)
+    indent: str = " " * level_of_recursion * 2
+    indent_plus_one: str = " " * (level_of_recursion + 1) * 2
+    parsley_logger.debug("%s%s: Resolving  %s", indent, level_of_recursion, field.name)
     base_field_type = field.type
     val = getattr(extended_obj, field.name, notfilled)
     path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
@@ -266,22 +296,46 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
         # assert dataclass_type is not None
 
         final_resolved_val: dict[str, Any] = {}
+
+        ###### CASE 1: Path to YAML file provided
         if not is_notfilled(path_val):
 
             assert isinstance(
                 path_val, str
             ), f"path_val must be a str, got {type(path_val)}"
+            parsley_logger.debug(
+                "%s%s: AAAAAtempt   %s from YAML file: %s",
+                indent,
+                level_of_recursion,
+                field.name,
+                path_val,
+            )
             resolved_val = asdict(
                 resolve_yaml_file_to_base_dataclass(
                     yaml_path=path_val,
                     base_cls=resolve_type(base_field_type),
                     raise_error_with_nones=raise_error_with_notfilled,
                     package_name=package_name,
+                    level_of_recursion=level_of_recursion + 1,
                 )
             )
-
+            parsley_logger.debug(
+                "%s%s: BBBBAAAAAtempt   %s from YAML file: %s",
+                indent,
+                level_of_recursion,
+                field.name,
+                path_val,
+            )
             final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
+            parsley_logger.debug(
+                "%s%s: Resolved   %s from YAML file: %s",
+                indent,
+                level_of_recursion,
+                field.name,
+                path_val,
+            )
 
+        ###### CASE 2: Direct value provided
         if not is_notfilled(val):
 
             if is_dataclass(val):
@@ -291,6 +345,14 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                 for dataclass_type in dataclass_type_list:
 
                     try:
+                        parsley_logger.debug(
+                            "%s%s: Attempting %s dataclass %s %s",
+                            indent_plus_one,
+                            level_of_recursion + 1,
+                            field.name,
+                            dataclass_type,
+                            val,
+                        )
                         if history_of_recursive_fields is None:
                             new_history__of_recursive_fields = [field.name]
                         else:
@@ -304,21 +366,39 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                             raise_error_with_notfilled=raise_error_with_notfilled,
                             history_of_recursive_fields=new_history__of_recursive_fields,
                             package_name=package_name,
+                            level_of_recursion=level_of_recursion + 1,
                         )
 
                         resolved_val_temp = remove_notfilled_values(resolved_val_temp)
 
                         _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
                         resolved_val = resolved_val_temp
+                        parsley_logger.debug(
+                            "%s%s: Success    %s dataclass %s",
+                            indent_plus_one,
+                            level_of_recursion + 1,
+                            field.name,
+                            dataclass_type,
+                        )
                         # print('sucess %s dataclass %s %s', field.name, dataclass_type, history_of_recursive_fields)
 
                     except Exception:
-                        # print('fail %s dataclass %s %s', field.name, dataclass_type, history_of_recursive_fields)
                         parsley_logger.debug(
-                            "fail %s dataclass %s %s", field.name, dataclass_type, val
+                            "%s%s: Fail       %s dataclass %s",
+                            indent_plus_one,
+                            level_of_recursion + 1,
+                            field.name,
+                            dataclass_type,
                         )
                 try:
                     resolved_val
+                    parsley_logger.debug(
+                        "%s%s: Resolved   %s: %s",
+                        indent,
+                        level_of_recursion,
+                        field.name,
+                        resolved_val,
+                    )
                 except NameError as exc:
                     print(
                         f"Variable (print) resolved_val is not defined in field {field} {val}"
@@ -343,13 +423,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     ):
                         try:
                             # print('Resolving YAML file for field:', field.name)
-                            print("debug PACKAGE NAME:", package_name)
                             resolved_val_temp = asdict(
                                 resolve_yaml_file_to_base_dataclass(
                                     yaml_path=val.get_yaml_file_path(),
                                     base_cls=resolve_type(dataclass_type),
                                     raise_error_with_nones=raise_error_with_notfilled,
                                     package_name=package_name,
+                                    level_of_recursion=level_of_recursion + 1,
                                 )
                             )
                             _ = from_dict(
@@ -373,6 +453,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
 
             final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
 
+        ###### CASE 3: Overwrite value provided
         if not is_notfilled(overwrite_val):
             assert is_dataclass(overwrite_val)
             dataclass_type_list = extract_union_types(base_field_type)
@@ -393,6 +474,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                         raise_error_with_notfilled=False,
                         history_of_recursive_fields=new_history__of_recursive_fields,
                         package_name=package_name,
+                        level_of_recursion=level_of_recursion + 1,
                     )
 
                     overwrite_resolved_val = remove_notfilled_values(
@@ -433,6 +515,7 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
     base_cls: Type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
+    level_of_recursion: int = 0,
 ) -> T_Dataclass:
     """Resolve an extended object to a dataclass object.
     Args:
@@ -448,6 +531,7 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         base_cls=base_cls,
         raise_error_with_notfilled=raise_error_with_nones,
         package_name=package_name,
+        level_of_recursion=level_of_recursion,
     )
 
     resolved_data = remove_notfilled_values(resolved_data)
