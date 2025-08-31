@@ -10,8 +10,8 @@ from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_extended_object,
 )
 
-___all__ = [
-    "Parlsey",
+__all__ = [
+    "Parsley",
     "create_parsley",
     "make_partial_dataclass_with_optional_paths",
     "resolve_yaml_file_to_base_dataclass",

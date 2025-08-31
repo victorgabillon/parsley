@@ -4,11 +4,7 @@ import os
 import types
 from dataclasses import Field, asdict, fields, is_dataclass
 from enum import Enum
-from hmac import new
-from math import e
-from operator import le, ne
 from pathlib import Path
-from struct import pack
 from typing import Any, Optional, Type, Union, cast, get_args, get_origin
 
 import dacite
@@ -16,8 +12,6 @@ import yaml
 from dacite import from_dict
 
 from parsley_coco.alternative_dataclasses import (
-    make_dataclass_with_optional_paths_and_overwrite,
-    make_partial_dataclass,
     make_partial_dataclass_notfilled,
     make_partial_dataclass_with_optional_paths,
 )
@@ -27,11 +21,8 @@ from parsley_coco.utils import (
     IsDataclass,
     extract_union_types,
     from_dict_with_union_handling,
-    is_optional_type,
     is_or_contains_dataclass,
     merge_nested_dicts,
-    print_dataclass_schema,
-    remove_none_values,
     remove_notfilled_values,
     resolve_type,
 )
@@ -275,7 +266,6 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     package_name: str | None = None,
     level_of_recursion: int = 0,
 ) -> Any:
-
     result_val: Any
     indent: str = " " * level_of_recursion * 2
     indent_plus_one: str = " " * (level_of_recursion + 1) * 2
@@ -292,17 +282,15 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     )
 
     if is_or_contains_dataclass(base_field_type) and not value_base:
-
         # assert dataclass_type is not None
 
         final_resolved_val: dict[str, Any] = {}
 
         ###### CASE 1: Path to YAML file provided
         if not is_notfilled(path_val):
-
-            assert isinstance(
-                path_val, str
-            ), f"path_val must be a str, got {type(path_val)}"
+            assert isinstance(path_val, str), (
+                f"path_val must be a str, got {type(path_val)}"
+            )
             parsley_logger.debug(
                 "%s%s: AAAAAtempt   %s from YAML file: %s",
                 indent,
@@ -337,13 +325,10 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
 
         ###### CASE 2: Direct value provided
         if not is_notfilled(val):
-
             if is_dataclass(val):
-
                 dataclass_type_list = extract_union_types(base_field_type)
 
                 for dataclass_type in dataclass_type_list:
-
                     try:
                         parsley_logger.debug(
                             "%s%s: Attempting %s dataclass %s %s",
@@ -410,11 +395,10 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                         f"Variable resolved_val is not defined in field {field} with value {val}"
                     ) from exc
 
-                assert (
-                    resolved_val is not None
-                ), f"resolved_val is None in field {field}"
+                assert resolved_val is not None, (
+                    f"resolved_val is None in field {field}"
+                )
             else:  # Non-dataclass value in a Union — allowed
-
                 assert hasattr(val, "get_yaml_file_path")
                 dataclass_type_list = extract_union_types(base_field_type)
                 for dataclass_type in dataclass_type_list:
@@ -458,9 +442,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
             assert is_dataclass(overwrite_val)
             dataclass_type_list = extract_union_types(base_field_type)
             for dataclass_type in dataclass_type_list:
-
                 try:
-
                     if history_of_recursive_fields is None:
                         new_history__of_recursive_fields = [field.name]
                     else:

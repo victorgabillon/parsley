@@ -26,15 +26,12 @@ Example usage:
 
 import argparse
 import logging
-from dataclasses import Field, fields
-from typing import Any, Type
+from typing import Type
 
 from parsley_coco.alternative_dataclasses import (
-    make_partial_dataclass,
-    make_partial_dataclass_notfilled,
     make_partial_dataclass_with_optional_paths,
 )
-from parsley_coco.logger import get_parsley_logger, set_parsley_logger, set_verbosity
+from parsley_coco.logger import set_parsley_logger, set_verbosity
 from parsley_coco.parser import Parsley
 from parsley_coco.utils import IsDataclass, add_arguments_from_dataclass
 

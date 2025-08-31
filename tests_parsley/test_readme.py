@@ -1,24 +1,27 @@
+"""Test the base configuration parsing."""
+
 import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-from click import command
 
 from parsley_coco import Parsley, create_parsley
 from parsley_coco.alternative_dataclasses import (
-    make_dataclass_with_optional_paths_and_overwrite,
     make_partial_dataclass_with_optional_paths,
 )
 
 
 @dataclass
 class Config:
+    """Configuration for the application."""
+
     x: int = 0
     y: str = "default"
 
 
 def test_base():
+    """Test the base configuration parsing."""
     parser = create_parsley(Config)
 
     ExtendedConfig = make_partial_dataclass_with_optional_paths(Config)
@@ -33,21 +36,17 @@ def test_base():
     assert config == Config(x=42, y="from_extra")
 
 
-from dataclasses import dataclass
-
-from parsley_coco import Parsley, create_parsley
-from parsley_coco.alternative_dataclasses import (
-    make_partial_dataclass_with_optional_paths,
-)
-
-
 @dataclass
 class NestedConfig:
+    """Configuration for the nested part of the application."""
+
     z: int
 
 
 @dataclass
 class Config2:
+    """Configuration for the application."""
+
     x: int
     y: str
     nested_config: NestedConfig
@@ -122,7 +121,6 @@ class Config4:
 
 
 def test_discriminator() -> None:
-
     # Create the parser
     parser: Parsley[Config4] = create_parsley(Config4)
 
@@ -135,7 +133,6 @@ def test_discriminator() -> None:
 
 
 def test_discriminator2() -> None:
-
     # Create the parser
     parser: Parsley[Config4] = create_parsley(Config4)
 
@@ -160,7 +157,6 @@ class Config6:
 
 
 def test_recursive_yaml() -> None:
-
     # Create the parser
     parser: Parsley[Config6] = create_parsley(Config6)
 
@@ -192,7 +188,6 @@ class AppConfig:
 
 
 def test_yaml_path_method() -> None:
-
     # Create the parser
     logger = logging.getLogger("my_logger")
     logger.setLevel(logging.INFO)

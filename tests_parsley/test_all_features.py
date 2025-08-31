@@ -1,10 +1,8 @@
 import os
-import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal, Optional, Union
 
-import dacite
 import yaml
 
 from parsley_coco import create_parsley
@@ -39,7 +37,6 @@ class SubConfigB:
 
 @dataclass
 class DeepConfig:
-
     preset: Preset | Union[SubConfigA, SubConfigB]
     sub: Union[SubConfigA, SubConfigB] = field(
         default_factory=lambda: SubConfigA(discriminator="A", value=78945)
@@ -110,8 +107,6 @@ def test_all_features(tmp_path):
     # --- Create parser and parse ---clear
 
     parser = create_parsley(RootConfig)
-
-    import os
 
     # Save the current working directory
     original_dir = os.getcwd()

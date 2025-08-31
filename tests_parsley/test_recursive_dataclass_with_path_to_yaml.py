@@ -1,6 +1,5 @@
-import re
 from dataclasses import dataclass
-from importlib.resources import as_file, files
+from importlib.resources import files
 
 from parsley_coco.recursive_dataclass_with_path_to_yaml import (
     resolve_yaml_file_to_base_dataclass,
@@ -60,7 +59,6 @@ def test_resolve_dataclass_from_yaml_2():
 
 
 def test_resolve_dataclass_from_yaml_3():
-
     resource = files("parsley_coco")
     print("debug resource:", resource)
     final_result = resolve_yaml_file_to_base_dataclass(

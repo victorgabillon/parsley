@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-
-from parsley_coco import create_parsley
 from parsley_coco.sentinels import notfilled
 from parsley_coco.utils import remove_notfilled_values
 

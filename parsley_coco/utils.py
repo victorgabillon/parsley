@@ -5,14 +5,11 @@ import types  # Import types to handle new-style Union
 from collections.abc import Mapping
 from dataclasses import (
     MISSING,
-    Field,
-    dataclass,
     field,
     fields,
     is_dataclass,
     make_dataclass,
 )
-from re import sub
 from types import UnionType
 from typing import (
     Any,
@@ -224,7 +221,7 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
         return a
     except UnionMatchError as e:
         # Handle UnionMatchError
-        print(f"Handling UnionMatchError for {data_class}")
+        print(f"Handling UnionMatchError for {data_class} with data {data}")
         if get_origin(data_class) in {
             Union,
             types.UnionType,
@@ -390,7 +387,6 @@ FieldTuple = Union[
 
 
 def extend_with_config(cls: Type[Any]) -> Type[Any]:
-
     # Extract existing fields
     original_fields: List[FieldTuple] = []
 

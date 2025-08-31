@@ -2,7 +2,6 @@
 
 # logger_module.py
 
-
 import logging
 
 # Setup shared logger and proxy
@@ -19,15 +18,30 @@ if not parsley_logger.handlers:
 
 
 def get_parsley_logger() -> logging.Logger:
+    """Get the shared Parsley logger.
+
+    Returns:
+        logging.Logger: The shared Parsley logger instance.
+    """
     return parsley_logger
 
 
 def set_parsley_logger(new_logger: logging.Logger) -> None:
+    """Set a new shared Parsley logger.
+
+    Args:
+        new_logger (logging.Logger): The new Parsley logger instance.
+    """
     global parsley_logger
     parsley_logger = new_logger
 
 
 def set_verbosity(level: int) -> None:
+    """Set the verbosity level of the shared Parsley logger.
+
+    Args:
+        level (int): The logging level to set (e.g., logging.DEBUG, logging.INFO).
+    """
     parsley_logger = get_parsley_logger()
     parsley_logger.setLevel(level)
     for handler in parsley_logger.handlers:

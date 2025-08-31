@@ -1,7 +1,6 @@
 """Alternative dataclass utilities for handling optional paths and overwriting
 dataclass fields."""
 
-import types
 from dataclasses import MISSING, field, fields, is_dataclass, make_dataclass
 from types import UnionType
 from typing import (
@@ -20,7 +19,7 @@ from typing import (
 )
 
 from parsley_coco.sentinels import _NotFilled, notfilled
-from parsley_coco.utils import is_or_contains_dataclass, print_dataclass_schema
+from parsley_coco.utils import is_or_contains_dataclass
 
 _partial_cache: Dict[Type[Any], Type[Any]] = {}
 
