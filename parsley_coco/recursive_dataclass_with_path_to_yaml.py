@@ -386,15 +386,13 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                             dataclass_type,
                         )
 
-                    except Exception as exc:
+                    except Exception:
                         # TODO investigate why we can not at the moment use the (TypeError, dacite.exceptions.UnionMatchError) instead of Exception atm.
                         # problem then encoutnered when doing python chipiron/scripts/main_chipiron.py --script_name one_match
                         # where the error raised is Exception : An error occurred: wrong value type for field "type" - should be "Literal" instead of value "neural_network" of type "str" ,type: <class 'Exception'>
                         # so as it is of type Exception we need to catch it as is. Maybe lets try to generate a more pecific error
                         # at least generate a test that recreates this issue within parsley coco and not in chipiron
                         # except (TypeError, dacite.exceptions.UnionMatchError):
-
-                        print(f"Exception : {exc} ,type: {type(exc)}")
 
                         parsley_logger.debug(
                             "%s%s: Fail       %s dataclass %s",

@@ -29,6 +29,10 @@ from dacite import Config, UnionMatchError, from_dict
 
 from parsley_coco.sentinels import is_notfilled, notfilled
 
+from parsley_coco.logger import get_parsley_logger
+
+parsley_logger = get_parsley_logger()
+
 
 def unflatten(dictionary: dict[Any, Any]) -> dict[Any, Any]:
     """Convert a flattened dictionary into a nested dictionary.
@@ -128,6 +132,7 @@ def is_optional_type(t: Any) -> bool:
 
 
 def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
+    """Print the schema of a dataclass."""
     if seen is None:
         seen = set()
 
@@ -212,7 +217,6 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
     Raises:
         Exception: If parsing fails for all types in the Union.
     """
-    # print_dataclass_schema(data_class)
 
     try:
         # Attempt to parse normally
@@ -221,7 +225,9 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
         return a
     except UnionMatchError as e:
         # Handle UnionMatchError
-        print(f"Handling UnionMatchError for {data_class} with data {data}")
+        parsley_logger.debug(
+            "Handling UnionMatchError for %r with data %r", data_class, data
+        )
         if get_origin(data_class) in {
             Union,
             types.UnionType,
@@ -231,7 +237,9 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
             for union_type in union_types:
                 try:
                     # Try parsing with each type in the Union
-                    print(f"Trying to parse with union type: {union_type}")
+                    parsley_logger.debug(
+                        "Trying to parse with union type: %r", union_type
+                    )
                     _ = from_dict_with_union_handling(union_type, data, config)
                 except Exception as inner_error:
                     # Collect errors for debugging
@@ -243,13 +251,15 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
             raise Exception(error_message) from None
         # If it's a dataclass, recursively handle nested fields
         elif is_dataclass(data_class):
-            print(f"Handling dataclass: {data_class.__name__}")
+            parsley_logger.debug("Handling dataclass: %r", data_class.__name__)
             field_errors = []
             for field_ in data_class.__annotations__:
                 field_type = data_class.__annotations__[field_]
-                print(
-                    f"Processing field: {field_} of type {field_type}, is"
-                    f" Union: {get_origin(field_type) in {Union, types.UnionType}}"
+                parsley_logger.debug(
+                    "Processing field: %r of type %r  Union: %r",
+                    field_,
+                    field_type,
+                    get_origin(field_type) in {Union, types.UnionType},
                 )
                 if get_origin(field_type) in {
                     Union,
@@ -261,7 +271,9 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                     for union_type in union_types:
                         try:
                             # Try parsing with each type in the Union
-                            print(f"Trying to parse with union type: {union_type}")
+                            parsley_logger.debug(
+                                "Trying to parse with union type: %r", union_type
+                            )
                             _ = from_dict_with_union_handling(
                                 union_type, data[field_], config
                             )
@@ -279,8 +291,9 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                         value = data[field_]
                         # Only re-parse if the value is a dict (raw data), not an already-parsed instance
                         if isinstance(value, Mapping):
-                            print(
-                                f"Recursively parsing nested dataclass field_ '{field_}'"
+                            parsley_logger.debug(
+                                "Recursively parsing nested dataclass field_ '%r'",
+                                field_,
                             )
                             data[field_] = from_dict_with_union_handling(
                                 cast(type, field_type), dict(value), config
@@ -298,7 +311,7 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
             raise e
     except Exception as e:
         # Handle other exceptions
-        print(f"An error occurred: {e}")
+        parsley_logger.debug("An error occurred: %r", e)
         raise Exception(f"An error occurred: {e}") from None
 
 
