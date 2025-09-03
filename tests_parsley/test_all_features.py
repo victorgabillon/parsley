@@ -135,7 +135,7 @@ def test_all_features(tmp_path):
     # (simulate what would happen if only preset is set)
     only_enum_config = {"deep": {"preset": "large"}}
     only_enum_config_path = tmp_path / "only_enum.yaml"
-    with open(only_enum_config_path, "w") as f:
+    with open(only_enum_config_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(only_enum_config, f)
 
     config2 = parser.parse_arguments(config_file_path=str(only_enum_config_path))

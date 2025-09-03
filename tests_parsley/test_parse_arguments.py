@@ -1,3 +1,5 @@
+"""Test the parsing of command line arguments and config file arguments."""
+
 from dataclasses import dataclass, field
 
 from parsley_coco import Parsley, create_parsley
@@ -64,3 +66,4 @@ def test_parse_arguments():
 
 if __name__ == "__main__":
     test_parse_arguments()
+    print("all tests passed")

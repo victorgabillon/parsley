@@ -1,6 +1,12 @@
+"""Test command line parsing."""
+
 from dataclasses import dataclass, field
 
 from parsley_coco import create_parsley
+from parsley_coco.logger import get_parsley_logger
+
+
+parsley_logger = get_parsley_logger()
 
 
 @dataclass
@@ -45,6 +51,7 @@ class A2:
 
 
 def test_cli_nested_dict_output():
+    """Test dataclass for parsing."""
     parsley = create_parsley(
         should_parse_command_line_arguments=True, args_dataclass_name=A
     )
@@ -62,6 +69,7 @@ def test_cli_nested_dict_output():
 
 
 def test_cli_nested_dict_output_2():
+    """Test dataclass for parsing."""
     parsley = create_parsley(
         should_parse_command_line_arguments=True, args_dataclass_name=A
     )
@@ -105,6 +113,7 @@ def test_cli_nested_dict_output_3():
 
 
 def test_cli_nested_dict_output_4():
+    """Test dataclass for parsing."""
     parsley = create_parsley(
         should_parse_command_line_arguments=True, args_dataclass_name=A
     )
@@ -128,6 +137,7 @@ def test_cli_nested_dict_output_4():
 
 
 def test_cli_nested_dict_output_5():
+    """Test dataclass for parsing."""
     parsley = create_parsley(
         should_parse_command_line_arguments=True, args_dataclass_name=A
     )
@@ -152,11 +162,31 @@ def test_cli_nested_dict_output_5():
     }
 
 
+@dataclass
+class Config:
+    """Test dataclass for parsing."""
+
+    x: int = 42
+    y: str = "default"
+
+
+def test_empty_command_line():
+    """Test empty command line arguments."""
+    parsley = create_parsley(
+        should_parse_command_line_arguments=True, args_dataclass_name=Config
+    )
+
+    args = parsley.parse_command_line_arguments(args=["--script_name", "one_match"])
+
+    assert not args  # Expecting empty dict as no arguments provided
+
+
 if __name__ == "__main__":
+    test_empty_command_line()
     test_cli_nested_dict_output()
     test_cli_nested_dict_output_2()
     test_cli_nested_dict_output_3()
     test_cli_nested_dict_output_4()
     test_cli_nested_dict_output_5()
 
-    print("All tests passed.")
+    parsley_logger.info("All tests passed.")

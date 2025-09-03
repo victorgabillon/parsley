@@ -135,7 +135,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         try:
             with open(config_file_path, "r", encoding="utf-8") as _:
                 try:
-                    ## read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
+                    # read the data from the yaml file and make the magic recursion so that recursive files are complied into one dataclass
                     # dataclass_from_conf_file: T_Dataclass = (
                     #    resolve_yaml_file_to_base_dataclass(
                     #        yaml_path=config_file_path,
@@ -152,7 +152,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                         )
                     )
 
-                    ## transforming back to dictionary to ease the potential future merges
+                    # transforming back to dictionary to ease the potential future merges
                     # args_config_file: dict[str, Any] = asdict(dataclass_from_conf_file)
 
                     args_config_file = remove_notfilled_values(d=args_config_file)
@@ -254,6 +254,7 @@ class Parsley[T_Dataclass: IsDataclass]:
             dicto=asdict(dataclass_args),
             base_cls=self.args_dataclass_name,
             raise_error_with_nones=False,
+            package_name=self.package_name,
         )
         new_dict = remove_notfilled_values(new_dict)
         parsley_logger.info("Final Merged args %s", new_dict)

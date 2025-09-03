@@ -60,7 +60,6 @@ def test_resolve_dataclass_from_yaml_2():
 
 def test_resolve_dataclass_from_yaml_3():
     resource = files("parsley_coco")
-    print("debug resource:", resource)
     final_result = resolve_yaml_file_to_base_dataclass(
         "tests_parsley/yaml_files/test_a3.yaml", A3, package_name=resource
     )

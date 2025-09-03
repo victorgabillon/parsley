@@ -6,6 +6,7 @@ from dataclasses import Field, asdict, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Type, Union, cast, get_args, get_origin
+import logging
 
 import dacite
 import yaml
@@ -28,6 +29,11 @@ from parsley_coco.utils import (
 )
 
 parsley_logger = get_parsley_logger()
+
+
+parsley_logger.setLevel(logging.DEBUG)
+for h in parsley_logger.handlers:
+    h.setLevel(logging.DEBUG)
 
 
 def resolve_package_path(
@@ -77,12 +83,14 @@ def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
     Raises:
         Exception: If the YAML file cannot be read.
     """
+    if not dicto:
+        return {}
+
     extended_cls = make_partial_dataclass_with_optional_paths(base_cls)
 
     extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
-    # print_dataclass_schema(cls=extended_cls)
 
     resolved_data: dict[str, Any] = resolve_extended_object_to_dict(
         extended_obj=extended_obj,
@@ -266,6 +274,14 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     package_name: str | None = None,
     level_of_recursion: int = 0,
 ) -> Any:
+    """Resolve an extended object to a dictionary.
+
+    Raises:
+        NameError: If the field name is not found in the extended object.
+        NameError: If the field type is not found in the extended object.
+        ValueError: If the field value is not valid.
+    """
+
     result_val: Any
     indent: str = " " * level_of_recursion * 2
     indent_plus_one: str = " " * (level_of_recursion + 1) * 2
@@ -356,7 +372,11 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
 
                         resolved_val_temp = remove_notfilled_values(resolved_val_temp)
 
-                        _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
+                        _ = from_dict_with_union_handling(
+                            data_class=dataclass_type,
+                            data=resolved_val_temp,
+                            config=dacite.Config(cast=[Enum]),
+                        )
                         resolved_val = resolved_val_temp
                         parsley_logger.debug(
                             "%s%s: Success    %s dataclass %s",
@@ -365,9 +385,17 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                             field.name,
                             dataclass_type,
                         )
-                        # print('sucess %s dataclass %s %s', field.name, dataclass_type, history_of_recursive_fields)
 
-                    except Exception:
+                    except Exception as exc:
+                        # TODO investigate why we can not at the moment use the (TypeError, dacite.exceptions.UnionMatchError) instead of Exception atm.
+                        # problem then encoutnered when doing python chipiron/scripts/main_chipiron.py --script_name one_match
+                        # where the error raised is Exception : An error occurred: wrong value type for field "type" - should be "Literal" instead of value "neural_network" of type "str" ,type: <class 'Exception'>
+                        # so as it is of type Exception we need to catch it as is. Maybe lets try to generate a more pecific error
+                        # at least generate a test that recreates this issue within parsley coco and not in chipiron
+                        # except (TypeError, dacite.exceptions.UnionMatchError):
+
+                        print(f"Exception : {exc} ,type: {type(exc)}")
+
                         parsley_logger.debug(
                             "%s%s: Fail       %s dataclass %s",
                             indent_plus_one,

@@ -4,17 +4,19 @@
 
 import logging
 
-# Setup shared logger and proxy
+
 parsley_logger = logging.getLogger("parsley_app")
 parsley_logger.setLevel(logging.INFO)
-
-
 if not parsley_logger.handlers:
     handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
     formatter = logging.Formatter("[%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     parsley_logger.addHandler(handler)
-    parsley_logger.propagate = False
+parsley_logger.propagate = False
+
+for h in parsley_logger.handlers:
+    h.setLevel(logging.INFO)
 
 
 def get_parsley_logger() -> logging.Logger:
