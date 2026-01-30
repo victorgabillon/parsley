@@ -11,6 +11,7 @@ import os
 from dataclasses import asdict
 from enum import Enum
 from typing import Any, Type
+from rich.pretty import pretty_repr
 
 import dacite
 import yaml
@@ -81,6 +82,8 @@ class Parsley[T_Dataclass: IsDataclass]:
             should_parse_command_line_arguments (bool, optional): Whether to parse command line arguments or not.
                 Defaults to True.
         """
+
+
         self.parser = parser
         self.should_parse_command_line_arguments = should_parse_command_line_arguments
         self.args_dataclass_name = args_dataclass_name
@@ -207,6 +210,7 @@ class Parsley[T_Dataclass: IsDataclass]:
                 raise_error_with_notfilled=False,
                 package_name=self.package_name,
             )
+            print("BVVVsAAAAAAAAAAAAAAAAAAa", extra_args_dict)
 
             extra_args_dict = remove_notfilled_values(d=extra_args_dict)
 
@@ -240,8 +244,11 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         assert self.merged_args is not None
 
-        parsley_logger.info("Merged args %s", self.merged_args)
+        parsley_logger.info("Merged args %s", pretty_repr(self.merged_args))
+        import inspect
+        print(inspect.getsource(self.args_dataclass_name))
 
+        print("sAAAAAAAAAAAAAAAAAAa", self.merged_args, self.args_dataclass_name)
         # Converting the args in the standardized dataclass
         dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,

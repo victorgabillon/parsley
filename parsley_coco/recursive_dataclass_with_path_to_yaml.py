@@ -125,13 +125,15 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
-    resolve_extended_object_ = resolve_extended_object(
+    resolve_extended_object_: T_Dataclass = resolve_extended_object(
         extended_obj,
         base_cls,
         raise_error_with_nones=raise_error_with_nones,
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
+
+
 
     return resolve_extended_object_
 
@@ -261,6 +263,7 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             package_name=package_name,
             level_of_recursion=level_of_recursion,
         )
+
 
     return resolved_data
 
@@ -432,16 +435,16 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                         dataclass_type, type
                     ):
                         try:
-                            # print('Resolving YAML file for field:', field.name)
-                            resolved_val_temp = asdict(
-                                resolve_yaml_file_to_base_dataclass(
+                            data_class_resolved = resolve_yaml_file_to_base_dataclass(
                                     yaml_path=val.get_yaml_file_path(),
                                     base_cls=resolve_type(dataclass_type),
                                     raise_error_with_nones=raise_error_with_notfilled,
                                     package_name=package_name,
                                     level_of_recursion=level_of_recursion + 1,
                                 )
-                            )
+
+                            resolved_val_temp = asdict(data_class_resolved)
+
                             _ = from_dict(
                                 data_class=dataclass_type, data=resolved_val_temp
                             )
@@ -541,6 +544,7 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
+
 
     resolved_data = remove_notfilled_values(resolved_data)
 
