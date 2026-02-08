@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from dataclasses import dataclass
 import enum
@@ -14,10 +13,12 @@ StrEnum = getattr(enum, "StrEnum", None)
 
 
 if StrEnum is None:
+
     class Kind(str, Enum):
         A = "A"
         B = "B"
 else:
+
     class Kind(StrEnum):
         A = "A"
         B = "B"
@@ -43,7 +44,9 @@ class OptionB:
 
 def test_literal_enum_member_accepts_string_value() -> None:
     cfg = Config(cast=[Enum])
-    obj = from_dict_with_union_handling(UsesLiteralEnumMember, {"kind": "A", "x": 1}, config=cfg)
+    obj = from_dict_with_union_handling(
+        UsesLiteralEnumMember, {"kind": "A", "x": 1}, config=cfg
+    )
     assert obj.kind == "A"
     assert obj.x == 1
 
@@ -51,7 +54,9 @@ def test_literal_enum_member_accepts_string_value() -> None:
 def test_literal_enum_member_rejects_unknown_string() -> None:
     cfg = Config(cast=[Enum])
     try:
-        from_dict_with_union_handling(UsesLiteralEnumMember, {"kind": "C", "x": 1}, config=cfg)
+        from_dict_with_union_handling(
+            UsesLiteralEnumMember, {"kind": "C", "x": 1}, config=cfg
+        )
     except Exception as exc:
         assert "Failed to parse" in str(exc) or "Union" in str(exc)
     else:
@@ -65,3 +70,10 @@ def test_union_selection_uses_discriminator() -> None:
     )
     assert isinstance(obj, OptionB)
     assert obj.name == "choice"
+
+
+if __name__ == "__main__":
+    test_literal_enum_member_accepts_string_value()
+    test_literal_enum_member_rejects_unknown_string()
+    test_union_selection_uses_discriminator()
+    print("All tests passed.")

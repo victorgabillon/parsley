@@ -83,7 +83,6 @@ class Parsley[T_Dataclass: IsDataclass]:
                 Defaults to True.
         """
 
-
         self.parser = parser
         self.should_parse_command_line_arguments = should_parse_command_line_arguments
         self.args_dataclass_name = args_dataclass_name
@@ -246,6 +245,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         parsley_logger.info("Merged args %s", pretty_repr(self.merged_args))
         import inspect
+
         print(inspect.getsource(self.args_dataclass_name))
 
         print("sAAAAAAAAAAAAAAAAAAa", self.merged_args, self.args_dataclass_name)

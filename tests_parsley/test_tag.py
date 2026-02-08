@@ -75,7 +75,12 @@ class TestDataClass2:
 class TestDataClass2_extra:
     """Test dataclass for parsing."""
 
-    first_attribute: Tags | TestDataClass = field(default_factory=lambda: TestDataClass(first_attribute=5, second_attribute="extra"))
+    first_attribute: Tags | TestDataClass = field(
+        default_factory=lambda: TestDataClass(
+            first_attribute=5, second_attribute="extra"
+        )
+    )
+
 
 @dataclass
 class TestDataClass3:
@@ -104,34 +109,32 @@ def test_creation():
         first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
     )
 
+
 def test_creation_extra():
     """Test the creation of the Parsley object."""
     parsley = create_parsley(
-        should_parse_command_line_arguments=False, args_dataclass_name=TestDataClass2_extra
+        should_parse_command_line_arguments=False,
+        args_dataclass_name=TestDataClass2_extra,
     )
     args = parsley.parse_arguments(
         extra_args=TestDataClass2_extra(
-        first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
-    )
+            first_attribute=TestDataClass(
+                first_attribute=3, second_attribute="defaultxx"
+            )
+        )
     )
 
     assert args == TestDataClass2_extra(
         first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
     )
 
-
     args_2 = parsley.parse_arguments(
-        extra_args=TestDataClass2_extra(
-        first_attribute=Tags.tag1
+        extra_args=TestDataClass2_extra(first_attribute=Tags.tag1)
     )
-    )
-    
+
     assert args_2 == TestDataClass2_extra(
         first_attribute=TestDataClass(first_attribute=3, second_attribute="defaultxx")
     )
-
-
-
 
 
 def test_creation_2():

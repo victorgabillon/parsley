@@ -133,8 +133,6 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
         level_of_recursion=level_of_recursion,
     )
 
-
-
     return resolve_extended_object_
 
 
@@ -263,7 +261,6 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
             package_name=package_name,
             level_of_recursion=level_of_recursion,
         )
-
 
     return resolved_data
 
@@ -436,12 +433,12 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
                     ):
                         try:
                             data_class_resolved = resolve_yaml_file_to_base_dataclass(
-                                    yaml_path=val.get_yaml_file_path(),
-                                    base_cls=resolve_type(dataclass_type),
-                                    raise_error_with_nones=raise_error_with_notfilled,
-                                    package_name=package_name,
-                                    level_of_recursion=level_of_recursion + 1,
-                                )
+                                yaml_path=val.get_yaml_file_path(),
+                                base_cls=resolve_type(dataclass_type),
+                                raise_error_with_nones=raise_error_with_notfilled,
+                                package_name=package_name,
+                                level_of_recursion=level_of_recursion + 1,
+                            )
 
                             resolved_val_temp = asdict(data_class_resolved)
 
@@ -544,7 +541,6 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
-
 
     resolved_data = remove_notfilled_values(resolved_data)
 

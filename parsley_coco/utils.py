@@ -1,6 +1,7 @@
 """Utility functions for various operations."""
 
 import argparse
+from enum import Enum
 import types  # Import types to handle new-style Union
 from collections.abc import Mapping
 from dataclasses import (
@@ -148,10 +149,9 @@ def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
         print(f"{prefix}{get_pretty_type(cls)} (not a dataclass)")
         return
 
-    hints = get_type_hints(cls)
 
-    for field_ in fields(cls):
-        field_type = hints.get(field_.name, field_.type)
+    hints = get_type_hints(data_class)
+    for field_, field_type in hints.items():
         type_str = get_pretty_type(field_type)
         # Include default value if available
         if field_.default is not MISSING:
@@ -201,31 +201,18 @@ def extract_dataclass_types(tp: Any) -> Any:
         yield tp
 
 
+
 def from_dict_with_union_handling[Dataclass: IsDataclass](
     data_class: Type[Dataclass], data: dict[Any, Any], config: Config | None = None
 ) -> Dataclass:
-    """
-    Wrapper around dacite.from_dict to handle Union types more gracefully, including nested dictionaries.
 
-    Args:
-        data_class (Type[Any]): The target data class.
-        data (dict): The dictionary to parse.
-        config (Config, optional): dacite configuration.
-
-    Returns:
-        Any: An instance of the data class.
-
-    Raises:
-        Exception: If parsing fails for all types in the Union.
-    """
+    # --- Literal shim ---
     if get_origin(data_class) is Literal:
         allowed = get_args(data_class)
         for literal_value in allowed:
             if data == literal_value:
                 return cast(Any, data)
-            if hasattr(literal_value, "value") and data == getattr(
-                literal_value, "value"
-            ):
+            if hasattr(literal_value, "value") and data == getattr(literal_value, "value"):
                 return cast(Any, data)
             if (
                 hasattr(data, "value")
@@ -235,44 +222,87 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                 return cast(Any, data)
         raise UnionMatchError(field_type=data_class, value=data)
 
+    # --- IMPORTANT: handle Union targets BEFORE calling dacite.from_dict ---
+    if get_origin(data_class) in {Union, types.UnionType}:
+        union_types = get_args(data_class)
+        errors = []
+        for union_type in union_types:
+            try:
+                parsley_logger.debug("Trying to parse with union type: %r", union_type)
+                parsed = from_dict_with_union_handling(union_type, data, config)
+                return cast(Any, parsed)
+            except Exception as inner_error:
+                errors.append(f"Failed with {union_type}: {inner_error}")
+
+        error_message = (
+            f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
+            + "\n".join(errors)
+        )
+        raise Exception(error_message) from None
+
+    # --- Base cases for non-dataclass targets ---
+    # When we probe Union branches, we may be asked to "parse" primitives like str/bool/int,
+    # Enums, NoneType, Any, or your _NotFilled sentinel. These should not go through dacite.from_dict.
+
+    # typing.Any accepts anything
+    if data_class is Any:
+        return cast(Any, data)
+
+    # NoneType
+    if data_class is type(None):
+        if data is None:
+            return cast(Any, None)
+        raise UnionMatchError(field_type=data_class, value=data)
+
+    # parsley sentinel
+    if data_class is type(notfilled):  # _NotFilled class
+        if is_notfilled(data):
+            return cast(Any, data)
+        raise UnionMatchError(field_type=data_class, value=data)
+
+    # Enums (including StrEnum)
     try:
-        # Attempt to parse normally
-        # config.strict=True
-        a = from_dict(data_class=data_class, data=data, config=config)
-        return a
+        if isinstance(data_class, type) and issubclass(data_class, Enum):
+            if isinstance(data, data_class):
+                return cast(Any, data)
+            if isinstance(data, str):
+                # interpret YAML string as Enum *value*
+                return cast(Any, data_class(data))
+            raise UnionMatchError(field_type=data_class, value=data)
+    except TypeError:
+        # data_class is not a class or not suitable for issubclass
+        pass
+
+    # Primitives / normal classes (str, bool, int, float, etc.)
+    if isinstance(data_class, type) and not is_dataclass(data_class):
+        if isinstance(data, data_class):
+            return cast(Any, data)
+        # Very conservative casting: only if it's a simple scalar and the cast works
+        try:
+            return cast(Any, data_class(data))
+        except Exception:
+            raise UnionMatchError(field_type=data_class, value=data)
+
+    # --- Normal dacite parse ---
+    try:
+        return from_dict(data_class=data_class, data=data, config=config)
+
     except UnionMatchError as e:
+
         # Handle UnionMatchError
         parsley_logger.debug(
             "Handling UnionMatchError for %r with data %r", data_class, data
         )
-        if get_origin(data_class) in {
-            Union,
-            types.UnionType,
-        }:  # Check for both old and new Union
-            union_types = get_args(data_class)  # Extract types from the Union
-            errors = []
-            for union_type in union_types:
-                try:
-                    # Try parsing with each type in the Union
-                    parsley_logger.debug(
-                        "Trying to parse with union type: %r", union_type
-                    )
-                    parsed = from_dict_with_union_handling(union_type, data, config)
-                    return cast(Any, parsed)
-                except Exception as inner_error:
-                    # Collect errors for debugging
-                    errors.append(f"Failed with {union_type}: {inner_error}")
+        # --- IMPORTANT: handle Union targets *before* calling dacite.from_dict ---
+        # dacite.from_dict may crash on PEP604 unions (A | B) on some Python versions.
 
-            # If all attempts fail, raise a clean error message
-            error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
-            error_message += "\n".join(errors)
-            raise Exception(error_message) from None
         # If it's a dataclass, recursively handle nested fields
-        elif is_dataclass(data_class):
+        if is_dataclass(data_class):
             parsley_logger.debug("Handling dataclass: %r", data_class.__name__)
             field_errors = []
-            for field_ in data_class.__annotations__:
-                field_type = data_class.__annotations__[field_]
+            hints = get_type_hints(data_class)
+            for field_, field_type in hints.items():
+
                 parsley_logger.debug(
                     "Processing field: %r of type %r  Union: %r",
                     field_,
