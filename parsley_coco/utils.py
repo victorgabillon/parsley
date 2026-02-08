@@ -23,6 +23,7 @@ from typing import (
     get_args,
     get_origin,
     get_type_hints,
+    Literal,
 )
 
 from dacite import Config, UnionMatchError, from_dict
@@ -217,6 +218,22 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
     Raises:
         Exception: If parsing fails for all types in the Union.
     """
+    if get_origin(data_class) is Literal:
+        allowed = get_args(data_class)
+        for literal_value in allowed:
+            if data == literal_value:
+                return cast(Any, data)
+            if hasattr(literal_value, "value") and data == getattr(
+                literal_value, "value"
+            ):
+                return cast(Any, data)
+            if (
+                hasattr(data, "value")
+                and hasattr(literal_value, "value")
+                and data.value == literal_value.value
+            ):
+                return cast(Any, data)
+        raise UnionMatchError(field_type=data_class, value=data)
 
     try:
         # Attempt to parse normally
@@ -240,7 +257,8 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                     parsley_logger.debug(
                         "Trying to parse with union type: %r", union_type
                     )
-                    _ = from_dict_with_union_handling(union_type, data, config)
+                    parsed = from_dict_with_union_handling(union_type, data, config)
+                    return cast(Any, parsed)
                 except Exception as inner_error:
                     # Collect errors for debugging
                     errors.append(f"Failed with {union_type}: {inner_error}")
@@ -265,25 +283,33 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                     Union,
                     types.UnionType,
                 }:  # Check for both old and new Union
+                    if field_ not in data:
+                        continue
                     # Extract types from the Union
                     union_types = get_args(field_type)
                     errors = []
+                    matched = False
                     for union_type in union_types:
                         try:
                             # Try parsing with each type in the Union
                             parsley_logger.debug(
                                 "Trying to parse with union type: %r", union_type
                             )
-                            _ = from_dict_with_union_handling(
+                            parsed = from_dict_with_union_handling(
                                 union_type, data[field_], config
                             )
+                            data[field_] = parsed
+                            matched = True
+                            break
                         except Exception as inner_error:
                             # Collect errors for debugging
                             errors.append(f"Failed with {union_type}: {inner_error}")
 
-                    # If all attempts fail, raise a clean error message
-                    error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
-                    error_message += "\n".join(errors)
+                    if not matched:
+                        # If all attempts fail, raise a clean error message
+                        error_message = f"Failed to parse data into any type of Union[{', '.join(str(t) for t in union_types)}].\n"
+                        error_message += "\n".join(errors)
+                        field_errors.append(error_message)
 
                 # Check if the field_ is a nested dataclass
                 elif is_dataclass(field_type):
@@ -304,15 +330,14 @@ def from_dict_with_union_handling[Dataclass: IsDataclass](
                         )
             if field_errors:
                 raise Exception("\n".join(field_errors)) from None
-            else:
-                raise e  # Re-raise if no specific Union handling was needed
+            return from_dict(data_class=data_class, data=data, config=config)
         else:
             # Re-raise the original exception if it's not a Union or dataclass
             raise e
     except Exception as e:
         # Handle other exceptions
         parsley_logger.debug("An error occurred: %r", e)
-        raise Exception(f"An error occurred: {e}") from None
+        raise
 
 
 def remove_none_values(d: dict[Any, Any]) -> dict[Any, Any]:
