@@ -10,7 +10,7 @@ from typing import Any, NoReturn, Protocol, Union, cast, get_args, get_origin
 
 import dacite
 import yaml
-from dacite import DaciteError, UnionMatchError, from_dict
+from dacite import from_dict
 
 from parsley.alternative_dataclasses import (
     make_partial_dataclass_notfilled,
@@ -19,8 +19,6 @@ from parsley.alternative_dataclasses import (
 from parsley.logger import get_parsley_logger
 from parsley.sentinels import is_notfilled, notfilled
 from parsley.utils import (
-    FieldUnionParsingError,
-    UnionParsingError,
     IsDataclass,
     extract_union_types,
     from_dict_with_union_handling,
@@ -39,8 +37,7 @@ for h in parsley_logger.handlers:
 
 
 class _HasYamlFilePath(Protocol):
-    def get_yaml_file_path(self) -> str:
-        """Return the YAML file path for the configuration."""
+    def get_yaml_file_path(self) -> str: ...
 
 
 class PackageRootRequiredError(ValueError):
@@ -165,9 +162,9 @@ def resolve_package_path(path: str | Path, package_root: str | None = None) -> s
     return path
 
 
-def resolve_extended_dict_to_dict_allow_notfilled[TDataclass: IsDataclass](
+def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
     dicto: dict[str, Any],
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
 ) -> dict[str, Any]:
@@ -175,7 +172,7 @@ def resolve_extended_dict_to_dict_allow_notfilled[TDataclass: IsDataclass](
 
     Args:
         dicto (dict[str, Any]): Input dictionary to resolve.
-        base_cls (Type[TDataclass]): The dataclass type to resolve to.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
         package_name (str | None): Optional package root name for resolving package paths.
 
@@ -205,24 +202,24 @@ def resolve_extended_dict_to_dict_allow_notfilled[TDataclass: IsDataclass](
     return resolved_data
 
 
-def resolve_dict_to_base_dataclass[TDataclass: IsDataclass](
+def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     dicto: dict[str, Any],
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
     level_of_recursion: int = 0,
-) -> TDataclass:
+) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
 
     Args:
         dicto (dict[str, Any]): Input dictionary to resolve.
-        base_cls (Type[TDataclass]): The dataclass type to resolve to.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
         package_name (str | None): Optional package root name for resolving package paths.
         level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
-        TDataclass: The resolved dataclass object.
+        T_Dataclass: The resolved dataclass object.
 
     Raises:
         Exception: If the YAML file cannot be read.
@@ -233,7 +230,7 @@ def resolve_dict_to_base_dataclass[TDataclass: IsDataclass](
     extended_obj = from_dict_with_union_handling(
         data_class=extended_cls, data=dicto, config=dacite.Config(cast=[Enum])
     )
-    resolve_extended_object_: TDataclass = resolve_extended_object(
+    resolve_extended_object_: T_Dataclass = resolve_extended_object(
         extended_obj,
         base_cls,
         raise_error_with_nones=raise_error_with_nones,
@@ -244,9 +241,9 @@ def resolve_dict_to_base_dataclass[TDataclass: IsDataclass](
     return resolve_extended_object_
 
 
-def resolve_yaml_file_to_dict_allow_notfilled[TDataclass: IsDataclass](
+def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
     yaml_path: str,
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
 ) -> dict[str, Any]:
@@ -254,12 +251,12 @@ def resolve_yaml_file_to_dict_allow_notfilled[TDataclass: IsDataclass](
 
     Args:
         yaml_path (str): The path to the YAML file.
-        base_cls (Type[TDataclass]): The dataclass type to resolve to.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
         package_name (str | None): Optional package root name for resolving package paths.
 
     Returns:
-        TDataclass: The resolved dataclass object.
+        T_Dataclass: The resolved dataclass object.
 
     Raises:
         Exception: If the YAML file cannot be read.
@@ -280,24 +277,24 @@ def resolve_yaml_file_to_dict_allow_notfilled[TDataclass: IsDataclass](
     )
 
 
-def resolve_yaml_file_to_base_dataclass[TDataclass: IsDataclass](
+def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
     yaml_path: str,
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
     level_of_recursion: int = 0,
-) -> TDataclass:
+) -> T_Dataclass:
     """Resolve a YAML file to a dataclass object.
 
     Args:
         yaml_path (str): The path to the YAML file.
-        base_cls (Type[TDataclass]): The dataclass type to resolve to.
+        base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
         package_name (str | None): Optional package root name for resolving package paths.
         level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
-        TDataclass: The resolved dataclass object.
+        T_Dataclass: The resolved dataclass object.
 
     Raises:
         Exception: If the YAML file cannot be read.
@@ -348,9 +345,9 @@ def extract_dataclass_type(t: Any) -> type | None:
     return None
 
 
-def resolve_extended_object_to_dict[TDataclass: IsDataclass](
+def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     extended_obj: IsDataclass,
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
     package_name: str | None = None,
@@ -360,7 +357,7 @@ def resolve_extended_object_to_dict[TDataclass: IsDataclass](
 
     Args:
         extended_obj (IsDataclass): The extended object to resolve.
-        base_cls (Type[TDataclass]): The base class type to resolve to.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
         raise_error_with_notfilled (bool): Whether to raise an error if notfilled values are encountered.
         history_of_recursive_fields (list[str] | None): Field ancestry for recursion tracking.
         package_name (str | None): Optional package root name for resolving package paths.
@@ -378,6 +375,7 @@ def resolve_extended_object_to_dict[TDataclass: IsDataclass](
     for field in fields(base_cls):
         resolved_data[field.name] = resolve_extended_object_to_dict_one_field(
             extended_obj=extended_obj,
+            base_cls=base_cls,
             raise_error_with_notfilled=raise_error_with_notfilled,
             field=field,
             history_of_recursive_fields=history_of_recursive_fields,
@@ -388,8 +386,9 @@ def resolve_extended_object_to_dict[TDataclass: IsDataclass](
     return resolved_data
 
 
-def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
+def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     extended_obj: IsDataclass,
+    base_cls: type[T_Dataclass],
     field: Field[Any],
     raise_error_with_notfilled: bool = True,
     history_of_recursive_fields: list[str] | None = None,
@@ -400,6 +399,7 @@ def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
 
     Args:
         extended_obj (IsDataclass): The extended object to resolve.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
         field (Field[Any]): Dataclass field being resolved.
         raise_error_with_notfilled (bool): Whether to raise on notfilled values.
         history_of_recursive_fields (list[str] | None): Field ancestry for recursion tracking.
@@ -507,14 +507,7 @@ def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
                             dataclass_type,
                         )
                         break  # first successful match wins
-                    except (
-                        DaciteError,
-                        FieldUnionParsingError,
-                        TypeError,
-                        UnionMatchError,
-                        UnionParsingError,
-                        ValueError,
-                    ):
+                    except Exception:
                         parsley_logger.debug(
                             "%s%s: Fail %s dataclass %s",
                             indent_plus_one,
@@ -559,12 +552,7 @@ def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
 
                             resolved_val = resolved_val_temp
                             break
-                        except (
-                            DaciteError,
-                            TypeError,
-                            UnionMatchError,
-                            ValueError,
-                        ):
+                        except Exception:
                             parsley_logger.debug(
                                 "fail %s yaml %s %s",
                                 field.name,
@@ -604,14 +592,7 @@ def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
                         overwrite_resolved_val_temp
                     )
                     break
-                except (
-                    DaciteError,
-                    FieldUnionParsingError,
-                    TypeError,
-                    UnionMatchError,
-                    UnionParsingError,
-                    ValueError,
-                ):
+                except Exception:
                     parsley_logger.debug(
                         "fail %s overwrite %s %s",
                         field.name,
@@ -637,24 +618,24 @@ def resolve_extended_object_to_dict_one_field[TDataclass: IsDataclass](
     return val
 
 
-def resolve_extended_object[TDataclass: IsDataclass](
+def resolve_extended_object[T_Dataclass: IsDataclass](
     extended_obj: Any,
-    base_cls: type[TDataclass],
+    base_cls: type[T_Dataclass],
     raise_error_with_nones: bool = True,
     package_name: str | None = None,
     level_of_recursion: int = 0,
-) -> TDataclass:
+) -> T_Dataclass:
     """Resolve an extended object to a dataclass object.
 
     Args:
         extended_obj (Any): The extended object to resolve.
-        base_cls (Type[TDataclass]): The base class type to resolve to.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
         package_name (str | None): Optional package root name for resolving package paths.
         level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
-        TDataclass: The resolved dataclass object.
+        T_Dataclass: The resolved dataclass object.
 
     """
     resolved_data: dict[str, Any] = resolve_extended_object_to_dict(

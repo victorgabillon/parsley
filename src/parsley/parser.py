@@ -58,7 +58,7 @@ class ArgsDataclassDefaultsError(ValueError):
         )
 
 
-class Parsley[TDataclass: IsDataclass]:
+class Parsley[T_Dataclass: IsDataclass]:
     """A class for parsing command line arguments and config file arguments.
 
     Attributes:
@@ -86,13 +86,13 @@ class Parsley[TDataclass: IsDataclass]:
     args_config_file: dict[str, Any] | None
     merged_args: dict[str, Any] | None
     should_parse_command_line_arguments: bool = True
-    args_dataclass_name: type[TDataclass]
+    args_dataclass_name: type[T_Dataclass]
     package_name: str | None = None
 
     def __init__(
         self,
         parser: Any,
-        args_dataclass_name: type[TDataclass],
+        args_dataclass_name: type[T_Dataclass],
         should_parse_command_line_arguments: bool = True,
         package_name: str | None = None,
     ) -> None:
@@ -100,7 +100,7 @@ class Parsley[TDataclass: IsDataclass]:
 
         Args:
             parser (Any): The parser object used for parsing command line arguments.
-            args_dataclass_name (type[TDataclass]): Dataclass that defines the arguments.
+            args_dataclass_name (type[T_Dataclass]): Dataclass that defines the arguments.
             should_parse_command_line_arguments (bool, optional): Whether to parse command line arguments or not.
                 Defaults to True.
             package_name (str | None): Optional package root name for resolving package paths.
@@ -183,7 +183,7 @@ class Parsley[TDataclass: IsDataclass]:
         extra_args: IsDataclass | None = None,
         config_file_path: str | None = None,
         args_command_line: dict[str, Any] | None = None,
-    ) -> TDataclass:
+    ) -> T_Dataclass:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
@@ -192,7 +192,7 @@ class Parsley[TDataclass: IsDataclass]:
             args_command_line (dict[str, Any] | None): Parsed command line args, if already available.
 
         Returns:
-            TDataclass: The merged dataclass arguments.
+            T_Dataclass: The merged dataclass arguments.
 
         """
         parsley_logger.info(
@@ -243,8 +243,13 @@ class Parsley[TDataclass: IsDataclass]:
         assert self.merged_args is not None
 
         parsley_logger.info("Merged args %s", pretty_repr(self.merged_args))
+        import inspect
+
+        print(inspect.getsource(self.args_dataclass_name))
+
+        print("sAAAAAAAAAAAAAAAAAAa", self.merged_args, self.args_dataclass_name)
         # Converting the args in the standardized dataclass
-        dataclass_args: TDataclass = dacite.from_dict(
+        dataclass_args: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
             data=self.merged_args,
             config=dacite.Config(cast=[Enum]),
@@ -261,7 +266,7 @@ class Parsley[TDataclass: IsDataclass]:
         parsley_logger.info("Final Merged args %s", new_dict)
 
         # Converting the args in the standardized dataclass
-        dataclass_args_final: TDataclass = dacite.from_dict(
+        dataclass_args_final: T_Dataclass = dacite.from_dict(
             data_class=self.args_dataclass_name,
             data=new_dict,
             config=dacite.Config(cast=[Enum]),
@@ -271,7 +276,7 @@ class Parsley[TDataclass: IsDataclass]:
 
     def parse_arguments(
         self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
-    ) -> TDataclass:
+    ) -> T_Dataclass:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
@@ -279,7 +284,7 @@ class Parsley[TDataclass: IsDataclass]:
             config_file_path (str | None): Optional YAML config file path.
 
         Returns:
-            TDataclass: The merged dataclass arguments.
+            T_Dataclass: The merged dataclass arguments.
 
         """
         args_command_line: dict[str, Any]

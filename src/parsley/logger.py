@@ -4,20 +4,18 @@
 
 import logging
 
-_logger_holder: dict[str, logging.Logger] = {
-    "logger": logging.getLogger("parsley_app")
-}
-_logger_holder["logger"].setLevel(logging.INFO)
-if not _logger_holder["logger"].handlers:
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("[%(levelname)s] %(message)s")
-    stream_handler.setFormatter(formatter)
-    _logger_holder["logger"].addHandler(stream_handler)
-_logger_holder["logger"].propagate = False
-
-for handler in _logger_holder["logger"].handlers:
+parsley_logger: logging.Logger = logging.getLogger("parsley_app")
+parsley_logger.setLevel(logging.INFO)
+if not parsley_logger.handlers:
+    handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    handler.setFormatter(formatter)
+    parsley_logger.addHandler(handler)
+parsley_logger.propagate = False
+
+for h in parsley_logger.handlers:
+    h.setLevel(logging.INFO)
 
 
 def get_parsley_logger() -> logging.Logger:
@@ -27,7 +25,7 @@ def get_parsley_logger() -> logging.Logger:
         logging.Logger: The shared Parsley logger instance.
 
     """
-    return _logger_holder["logger"]
+    return parsley_logger
 
 
 def set_parsley_logger(new_logger: logging.Logger) -> None:
@@ -37,7 +35,8 @@ def set_parsley_logger(new_logger: logging.Logger) -> None:
         new_logger (logging.Logger): The new Parsley logger instance.
 
     """
-    _logger_holder["logger"] = new_logger
+    global parsley_logger
+    parsley_logger = new_logger
 
 
 def set_verbosity(level: int) -> None:
@@ -47,7 +46,7 @@ def set_verbosity(level: int) -> None:
         level (int): The logging level to set (e.g., logging.DEBUG, logging.INFO).
 
     """
-    logger = get_parsley_logger()
-    logger.setLevel(level)
-    for handler in logger.handlers:
+    parsley_logger = get_parsley_logger()
+    parsley_logger.setLevel(level)
+    for handler in parsley_logger.handlers:
         handler.setLevel(level)

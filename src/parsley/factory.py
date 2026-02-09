@@ -34,13 +34,13 @@ from parsley.parser import Parsley
 from parsley.utils import IsDataclass, add_arguments_from_dataclass
 
 
-def create_parsley[TDataclass: IsDataclass](
-    args_dataclass_name: type[TDataclass],
+def create_parsley[DataclassType: IsDataclass](
+    args_dataclass_name: type[DataclassType],
     should_parse_command_line_arguments: bool = True,
     logger: logging.Logger | None = None,
     verbosity: int = 0,
     package_name: str | None = None,
-) -> Parsley[TDataclass]:
+) -> Parsley[DataclassType]:
     """Create an argument parser for command line arguments.
 
     Args:
@@ -75,7 +75,7 @@ def create_parsley[TDataclass: IsDataclass](
         cls=make_partial_dataclass_with_optional_paths(cls=args_dataclass_name),
     )
 
-    my_parser: Parsley[TDataclass] = Parsley(
+    my_parser: Parsley[DataclassType] = Parsley(
         parser=parser,
         args_dataclass_name=args_dataclass_name,
         should_parse_command_line_arguments=should_parse_command_line_arguments,
