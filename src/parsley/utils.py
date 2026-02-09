@@ -37,6 +37,7 @@ class UnionParsingError(Exception):
     """Raised when data cannot be parsed into any union member."""
 
     def __init__(self, union_types: tuple[Any, ...], errors: list[str]) -> None:
+        """Initialize the error with union types and parse errors."""
         super().__init__(
             "Failed to parse data into any type of Union["
             + ", ".join(str(t) for t in union_types)
@@ -49,6 +50,7 @@ class FieldUnionParsingError(Exception):
     """Raised when one or more fields fail union parsing."""
 
     def __init__(self, field_errors: list[str]) -> None:
+        """Initialize the error with field parsing errors."""
         super().__init__("\n".join(field_errors))
 
 
@@ -105,6 +107,7 @@ def remove_none(d: dict[str, Any]) -> dict[str, Any]:
 
 
 def is_or_contains_dataclass(tp: Any) -> bool:
+    """Return True if a type is a dataclass or contains one within containers/unions."""
     origin = get_origin(tp)
     args = get_args(tp)
 
@@ -121,6 +124,7 @@ def is_or_contains_dataclass(tp: Any) -> bool:
 
 
 def extract_union_types(tp: Any) -> Any | list[Any]:
+    """Return the list of union member types (or a list with the type itself)."""
     origin = get_origin(tp)
 
     if origin in (Union, UnionType):
@@ -228,6 +232,7 @@ T = TypeVar("T")
 def from_dict_with_union_handling[T](
     data_class: type[T], data: Any, config: Config | None = None
 ) -> T:
+    """Create a dataclass instance while handling unions and literals."""
     # --- Literal shim ---
     if get_origin(data_class) is Literal:
         allowed = get_args(data_class)
@@ -406,6 +411,7 @@ def remove_notfilled_values(d: dict[Any, Any]) -> dict[Any, Any]:
 
 
 def resolve_type(typ: Any) -> Any:
+    """Resolve a type by removing optional/notfilled wrappers when possible."""
     origin = get_origin(typ)
 
     if origin in (Union, UnionType):
@@ -421,6 +427,7 @@ def resolve_type(typ: Any) -> Any:
 
 # --- Helper to flatten dataclass fields ---
 def flatten_fields(cls: type[Any], prefix: str = "") -> dict[str, Any]:
+    """Flatten dataclass fields into dotted-name mappings."""
     flat_fields = {}
     for f in fields(cls):
         field_type = f.type
@@ -437,6 +444,7 @@ def flatten_fields(cls: type[Any], prefix: str = "") -> dict[str, Any]:
 def add_arguments_from_dataclass(
     parser: argparse.ArgumentParser, cls: type[Any]
 ) -> None:
+    """Add argparse options based on dataclass fields."""
     flat_fields = flatten_fields(cls)
     for name, f in flat_fields.items():
         parser.add_argument(
@@ -453,6 +461,7 @@ FieldTuple = (
 
 
 def extend_with_config(cls: type[Any]) -> type[Any]:
+    """Return a dataclass that adds a config_file_name field to the original."""
     # Extract existing fields
     original_fields: list[FieldTuple] = []
 
