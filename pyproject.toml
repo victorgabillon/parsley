@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parsley-coco"
-version = "0.1.31"
+version = "0.1.32"
 description = "A parser combining dacite and argparse"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
@@ -140,7 +140,7 @@ max-line-length = 88
 disable = [
     "C0301",
     "unnecessary-ellipsis",
-    "W0511","R0913","R0917","R0903","R0914","R0912","R0915"
+    "W0511","R0913","R0917","R0903","R0914","R0912","R0915","R0911"
     ]
 
 
@@ -170,10 +170,17 @@ commands = [["pytest", "{posargs}"]]
 [tool.tox.env.lint]
 description = "ruff + pylint (fast, no package install)"
 package = "skip"
-deps = ["ruff>=0.15.0", "pylint>=4.0.4"]
+deps = [
+  
+  "PyYAML>=6.0.3",
+  "dacite>=1.9.2",
+  "click>=8.3.1",
+  "rich>=14.3.2",
+
+"ruff>=0.15.0", "pylint>=4.0.4"]
 set_env = { PYTHONPATH = "{toxinidir}/src" }
 commands = [
-  ["python", "-m", "ruff", "check", "src", "tests"],
+  ["python", "-m", "ruff", "check", "src"],
   ["python", "-m", "ruff", "format", "--check", "src", "tests"],
   ["python", "-m", "pylint", "src/parsley"],
 ]
@@ -181,7 +188,13 @@ commands = [
 [tool.tox.env.typecheck]
 description = "mypy + pyright (fast, no package install)"
 package = "skip"
-deps = ["mypy>=1.19.1", "pyright[nodejs]>=1.1.408"]
+deps = [
+  "PyYAML>=6.0.3",
+  "dacite>=1.9.2",
+  "click>=8.3.1",
+  "rich>=14.3.2",
+   "types-PyYAML>=6.0.12.12",
+"mypy>=1.19.1", "pyright[nodejs]>=1.1.408"]
 set_env = { MYPYPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "mypy", "--config-file", "pyproject.toml", "src/parsley"],

@@ -1,52 +1,44 @@
 """Logger module for the Parsley application."""
 
-# logger_module.py
-
 import logging
 
-parsley_logger: logging.Logger = logging.getLogger("parsley_app")
-parsley_logger.setLevel(logging.INFO)
-if not parsley_logger.handlers:
-    handler = logging.StreamHandler()
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("[%(levelname)s] %(message)s")
-    handler.setFormatter(formatter)
-    parsley_logger.addHandler(handler)
-parsley_logger.propagate = False
+_parsley_logger: logging.Logger = logging.getLogger("parsley_app")
+_parsley_logger.setLevel(logging.INFO)
 
-for h in parsley_logger.handlers:
-    h.setLevel(logging.INFO)
+if not _parsley_logger.handlers:
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    stream_handler.setFormatter(formatter)
+    _parsley_logger.addHandler(stream_handler)
+
+_parsley_logger.propagate = False
 
 
 def get_parsley_logger() -> logging.Logger:
-    """Get the shared Parsley logger.
-
-    Returns:
-        logging.Logger: The shared Parsley logger instance.
-
-    """
-    return parsley_logger
+    """Return the shared Parsley logger instance."""
+    return _parsley_logger
 
 
 def set_parsley_logger(new_logger: logging.Logger) -> None:
-    """Set a new shared Parsley logger.
+    """Update the shared logger configuration using another logger.
 
-    Args:
-        new_logger (logging.Logger): The new Parsley logger instance.
-
+    The logger identity stays the same, but its level and handlers
+    are replaced.
     """
-    global parsley_logger
-    parsley_logger = new_logger
+    logger = get_parsley_logger()
+
+    logger.handlers.clear()
+    for handler in new_logger.handlers:
+        logger.addHandler(handler)
+
+    logger.setLevel(new_logger.level)
 
 
 def set_verbosity(level: int) -> None:
-    """Set the verbosity level of the shared Parsley logger.
+    """Set verbosity level of the shared Parsley logger."""
+    logger = get_parsley_logger()
+    logger.setLevel(level)
 
-    Args:
-        level (int): The logging level to set (e.g., logging.DEBUG, logging.INFO).
-
-    """
-    parsley_logger = get_parsley_logger()
-    parsley_logger.setLevel(level)
-    for handler in parsley_logger.handlers:
+    for handler in logger.handlers:
         handler.setLevel(level)

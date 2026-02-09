@@ -58,7 +58,7 @@ class ArgsDataclassDefaultsError(ValueError):
         )
 
 
-class Parsley[T_Dataclass: IsDataclass]:
+class Parsley[T: IsDataclass]:
     """A class for parsing command line arguments and config file arguments.
 
     Attributes:
@@ -86,13 +86,13 @@ class Parsley[T_Dataclass: IsDataclass]:
     args_config_file: dict[str, Any] | None
     merged_args: dict[str, Any] | None
     should_parse_command_line_arguments: bool = True
-    args_dataclass_name: type[T_Dataclass]
+    args_dataclass_name: type[T]
     package_name: str | None = None
 
     def __init__(
         self,
         parser: Any,
-        args_dataclass_name: type[T_Dataclass],
+        args_dataclass_name: type[T],
         should_parse_command_line_arguments: bool = True,
         package_name: str | None = None,
     ) -> None:
@@ -183,7 +183,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         extra_args: IsDataclass | None = None,
         config_file_path: str | None = None,
         args_command_line: dict[str, Any] | None = None,
-    ) -> T_Dataclass:
+    ) -> T:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
@@ -243,13 +243,9 @@ class Parsley[T_Dataclass: IsDataclass]:
         assert self.merged_args is not None
 
         parsley_logger.info("Merged args %s", pretty_repr(self.merged_args))
-        import inspect
 
-        print(inspect.getsource(self.args_dataclass_name))
-
-        print("sAAAAAAAAAAAAAAAAAAa", self.merged_args, self.args_dataclass_name)
         # Converting the args in the standardized dataclass
-        dataclass_args: T_Dataclass = dacite.from_dict(
+        dataclass_args: T = dacite.from_dict(
             data_class=self.args_dataclass_name,
             data=self.merged_args,
             config=dacite.Config(cast=[Enum]),
@@ -266,7 +262,7 @@ class Parsley[T_Dataclass: IsDataclass]:
         parsley_logger.info("Final Merged args %s", new_dict)
 
         # Converting the args in the standardized dataclass
-        dataclass_args_final: T_Dataclass = dacite.from_dict(
+        dataclass_args_final: T = dacite.from_dict(
             data_class=self.args_dataclass_name,
             data=new_dict,
             config=dacite.Config(cast=[Enum]),
@@ -276,7 +272,7 @@ class Parsley[T_Dataclass: IsDataclass]:
 
     def parse_arguments(
         self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
-    ) -> T_Dataclass:
+    ) -> T:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
