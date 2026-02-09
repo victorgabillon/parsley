@@ -1,5 +1,7 @@
-"""This module contains the definition of the MyParser class, which is responsible for parsing command line arguments
-and config file arguments for a script.
+"""Parser utilities for command line and config file arguments.
+
+Defines the Parsley class, which is responsible for parsing command line
+arguments and config file arguments for a script.
 
 Classes:
 - Parsley: A class for parsing command line arguments and config file arguments.
@@ -39,6 +41,7 @@ class ConfigFileProcessingError(ValueError):
     """Raised when a config file cannot be processed for a dataclass."""
 
     def __init__(self, config_file_path: str, dataclass_type: type[Any]) -> None:
+        """Initialize the error with the file path and dataclass type."""
         super().__init__(
             f"Could not process file {config_file_path} as {dataclass_type}."
         )
@@ -48,6 +51,7 @@ class ArgsDataclassDefaultsError(ValueError):
     """Raised when the args dataclass cannot be instantiated with defaults."""
 
     def __init__(self, dataclass_type: type[Any]) -> None:
+        """Initialize the error for missing dataclass defaults."""
         super().__init__(
             "The Args dataclass should have all its attributes set to default "
             f"values to allow default instantiation. When dealing with {dataclass_type}()"
@@ -96,8 +100,10 @@ class Parsley[T_Dataclass: IsDataclass]:
 
         Args:
             parser (Any): The parser object used for parsing command line arguments.
+            args_dataclass_name (type[T_Dataclass]): Dataclass that defines the arguments.
             should_parse_command_line_arguments (bool, optional): Whether to parse command line arguments or not.
                 Defaults to True.
+            package_name (str | None): Optional package root name for resolving package paths.
 
         """
         self.parser = parser
@@ -138,6 +144,12 @@ class Parsley[T_Dataclass: IsDataclass]:
         return remove_notfilled_values(d=parsed_command_line_dict)
 
     def parse_config_file_arguments(self, config_file_path: str) -> None:
+        """Parse arguments from a YAML config file.
+
+        Args:
+            config_file_path (str): Path to the YAML file.
+
+        """
         args_config_file: dict[str, Any] = {}  # <--- initialize
 
         try:
@@ -175,11 +187,12 @@ class Parsley[T_Dataclass: IsDataclass]:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
-            extra_args (dict[str, Any], optional): Extra arguments to be merged with the parsed arguments.
-            Defaults to None.
+            extra_args (IsDataclass | None): Extra dataclass arguments to merge.
+            config_file_path (str | None): Optional YAML config file path.
+            args_command_line (dict[str, Any] | None): Parsed command line args, if already available.
 
         Returns:
-            dict[str, Any]: A dictionary containing the merged arguments.
+            T_Dataclass: The merged dataclass arguments.
 
         """
         parsley_logger.info(
@@ -267,11 +280,11 @@ class Parsley[T_Dataclass: IsDataclass]:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
-            extra_args (dict[str, Any], optional): Extra arguments to be merged with the parsed arguments.
-            Defaults to None.
+            extra_args (IsDataclass | None): Extra dataclass arguments to merge.
+            config_file_path (str | None): Optional YAML config file path.
 
         Returns:
-            dict[str, Any]: A dictionary containing the merged arguments.
+            T_Dataclass: The merged dataclass arguments.
 
         """
         args_command_line: dict[str, Any]

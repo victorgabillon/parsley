@@ -44,6 +44,7 @@ class PackageRootRequiredError(ValueError):
     """Raised when a package root is required but not provided."""
 
     def __init__(self, path: str) -> None:
+        """Initialize the error with the unresolved package path."""
         super().__init__(
             f"'package://' path used ({path}), but no package_root was provided."
         )
@@ -53,6 +54,7 @@ class YamlFileReadError(FileNotFoundError):
     """Raised when a YAML file cannot be read."""
 
     def __init__(self, yaml_path: str) -> None:
+        """Initialize the error with the YAML path."""
         super().__init__(f"Could not read file: {yaml_path}")
 
 
@@ -60,6 +62,7 @@ class PathValueTypeError(TypeError):
     """Raised when a YAML path value is not a string."""
 
     def __init__(self, actual_type: type[Any]) -> None:
+        """Initialize the error with the offending value type."""
         super().__init__(f"path_val must be a str, got {actual_type}")
 
 
@@ -67,6 +70,7 @@ class DataclassUnionResolutionError(LookupError):
     """Raised when a dataclass union cannot be resolved."""
 
     def __init__(self, field: Field[Any], value: Any) -> None:
+        """Initialize the error with the field and value."""
         super().__init__(
             f"Could not resolve dataclass union for field {field} with value {value}"
         )
@@ -76,6 +80,7 @@ class MissingYamlPathProviderError(TypeError):
     """Raised when a YAML path provider object is missing the required method."""
 
     def __init__(self, field_name: str, actual_type: type[Any]) -> None:
+        """Initialize the error with the field name and value type."""
         super().__init__(
             "Expected dataclass or object with get_yaml_file_path for field "
             f"{field_name}, got {actual_type}"
@@ -86,6 +91,7 @@ class NotFilledYamlPathError(TypeError):
     """Raised when a notfilled value is used where a YAML path is required."""
 
     def __init__(self, field_name: str) -> None:
+        """Initialize the error with the field name."""
         super().__init__(f"Field {field_name}: notfilled has no yaml path")
 
 
@@ -93,6 +99,7 @@ class YamlBackedUnionResolutionError(LookupError):
     """Raised when a YAML-backed union cannot be resolved."""
 
     def __init__(self, field: Field[Any], value: Any) -> None:
+        """Initialize the error with the field and value."""
         super().__init__(
             f"Could not resolve YAML-backed union for field {field} with value {value}"
         )
@@ -102,6 +109,7 @@ class OverwriteValueTypeError(TypeError):
     """Raised when an overwrite value is not a dataclass."""
 
     def __init__(self, field_name: str, actual_type: type[Any]) -> None:
+        """Initialize the error with the field name and value type."""
         super().__init__(
             f"overwrite_val must be a dataclass for field {field_name}, got {actual_type}"
         )
@@ -111,6 +119,7 @@ class OverwriteUnionResolutionError(LookupError):
     """Raised when an overwrite union cannot be resolved."""
 
     def __init__(self, field: Field[Any], value: Any) -> None:
+        """Initialize the error with the field and value."""
         super().__init__(
             f"Could not resolve overwrite union for field {field} with value {value}"
         )
@@ -120,6 +129,7 @@ class MissingValueOrPathError(ValueError):
     """Raised when neither a value nor a YAML path is provided for a field."""
 
     def __init__(self, field_name: str) -> None:
+        """Initialize the error with the field name."""
         super().__init__(
             f"Exactly one of '{field_name}' or '{field_name}_path_to_yaml_file' must be provided."
         )
@@ -161,12 +171,13 @@ def resolve_extended_dict_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
     """Resolve a YAML file to a dataclass object.
 
     Args:
-        yaml_path (str): The path to the YAML file.
+        dicto (dict[str, Any]): Input dictionary to resolve.
         base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        package_name (str | None): Optional package root name for resolving package paths.
 
     Returns:
-        T_Dataclass: The resolved dataclass object.
+        dict[str, Any]: The resolved dictionary.
 
     Raises:
         Exception: If the YAML file cannot be read.
@@ -201,9 +212,11 @@ def resolve_dict_to_base_dataclass[T_Dataclass: IsDataclass](
     """Resolve a YAML file to a dataclass object.
 
     Args:
-        yaml_path (str): The path to the YAML file.
+        dicto (dict[str, Any]): Input dictionary to resolve.
         base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        package_name (str | None): Optional package root name for resolving package paths.
+        level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
         T_Dataclass: The resolved dataclass object.
@@ -240,6 +253,7 @@ def resolve_yaml_file_to_dict_allow_notfilled[T_Dataclass: IsDataclass](
         yaml_path (str): The path to the YAML file.
         base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        package_name (str | None): Optional package root name for resolving package paths.
 
     Returns:
         T_Dataclass: The resolved dataclass object.
@@ -276,6 +290,8 @@ def resolve_yaml_file_to_base_dataclass[T_Dataclass: IsDataclass](
         yaml_path (str): The path to the YAML file.
         base_cls (Type[T_Dataclass]): The dataclass type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        package_name (str | None): Optional package root name for resolving package paths.
+        level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
         T_Dataclass: The resolved dataclass object.
@@ -342,7 +358,10 @@ def resolve_extended_object_to_dict[T_Dataclass: IsDataclass](
     Args:
         extended_obj (IsDataclass): The extended object to resolve.
         base_cls (Type[T_Dataclass]): The base class type to resolve to.
-        raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        raise_error_with_notfilled (bool): Whether to raise an error if notfilled values are encountered.
+        history_of_recursive_fields (list[str] | None): Field ancestry for recursion tracking.
+        package_name (str | None): Optional package root name for resolving package paths.
+        level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
         dict[str, Any]: The resolved dictionary.
@@ -376,6 +395,21 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     package_name: str | None = None,
     level_of_recursion: int = 0,
 ) -> Any:
+    """Resolve one field from an extended object into a base value.
+
+    Args:
+        extended_obj (IsDataclass): The extended object to resolve.
+        base_cls (Type[T_Dataclass]): The base class type to resolve to.
+        field (Field[Any]): Dataclass field being resolved.
+        raise_error_with_notfilled (bool): Whether to raise on notfilled values.
+        history_of_recursive_fields (list[str] | None): Field ancestry for recursion tracking.
+        package_name (str | None): Optional package root name for resolving package paths.
+        level_of_recursion (int): Current recursion depth for logging.
+
+    Returns:
+        Any: The resolved field value.
+
+    """
     def _raise_notfilled_yaml_path(field_name: str) -> NoReturn:
         raise NotFilledYamlPathError(field_name)
 
@@ -596,6 +630,8 @@ def resolve_extended_object[T_Dataclass: IsDataclass](
         extended_obj (Any): The extended object to resolve.
         base_cls (Type[T_Dataclass]): The base class type to resolve to.
         raise_error_with_nones (bool): Whether to raise an error if None values are encountered.
+        package_name (str | None): Optional package root name for resolving package paths.
+        level_of_recursion (int): Current recursion depth for logging.
 
     Returns:
         T_Dataclass: The resolved dataclass object.

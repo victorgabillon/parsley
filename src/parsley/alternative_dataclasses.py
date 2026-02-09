@@ -1,5 +1,6 @@
-"""Alternative dataclass utilities for handling optional paths and overwriting
-dataclass fields.
+"""Alternative dataclass utilities for handling optional paths and overwriting dataclass fields.
+
+Provides helpers for optional path fields and overwrite-aware dataclass variants.
 """
 
 from collections.abc import Callable
@@ -24,6 +25,7 @@ class DataclassTypeError(TypeError):
     """Raised when a non-dataclass type is provided."""
 
     def __init__(self, cls: Any) -> None:
+        """Initialize the error with the offending class."""
         super().__init__(f"{cls} is not a dataclass")
 
 
@@ -62,6 +64,7 @@ def make_dataclass_with_optional_paths_and_overwrite(
     cls: type[Any], _processed: dict[type[Any], type[Any]] | None = None
 ) -> type[Any]:
     """Create a dataclass with optional paths and overwrite fields.
+
     This function takes a dataclass and creates a new dataclass with
     additional fields for optional paths and overwrite values.
 
@@ -200,6 +203,7 @@ def make_partial_dataclass(cls: type[Any]) -> type[Any]:
 
 
 def transform_type_for_notfilled(tp: Any) -> Any:
+    """Recursively transform types by allowing the notfilled sentinel."""
     origin = get_origin(tp)
     args = get_args(tp)
 
@@ -259,6 +263,7 @@ def make_partial_dataclass_notfilled(cls: type[Any]) -> type[Any]:
 
 def make_partial_dataclass_with_optional_paths(cls: type[Any]) -> type[Any]:
     """Create a partial dataclass with optional paths from the given dataclass.
+
     This function combines the functionality of `make_partial_dataclass` and
     `make_dataclass_with_optional_paths_and_overwrite` to create a new dataclass
     that includes optional paths and overwrite fields.

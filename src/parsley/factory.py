@@ -1,4 +1,4 @@
-"""This module provides a function to create an argument parser for command line arguments.
+"""Argument parser factory for command line arguments.
 
 The `create_parser` function takes in the name of a dataclass, which represents the arguments
 that can be parsed from the command line. It creates an instance of `argparse.ArgumentParser`
@@ -44,11 +44,14 @@ def create_parsley[DataclassType: IsDataclass](
     """Create an argument parser for command line arguments.
 
     Args:
-        args_class_name: The name of the dataclass representing the arguments.
+        args_dataclass_name: Dataclass representing the script arguments.
         should_parse_command_line_arguments: Whether to parse command line arguments.
+        logger: Optional logger to configure parsley logging.
+        verbosity: Logging verbosity level.
+        package_name: Optional package root name for resolving package paths.
 
     Returns:
-        An instance of MyParser, which is a custom wrapper around argparse.ArgumentParser.
+        An instance of Parsley, which wraps argparse.ArgumentParser.
 
     """
     if logger is not None:
