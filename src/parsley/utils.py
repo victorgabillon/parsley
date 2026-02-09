@@ -11,13 +11,12 @@ from dataclasses import (
     make_dataclass,
 )
 from enum import Enum
-from types import UnionType
+from types import NoneType, UnionType
 from typing import (
     Any,
     ClassVar,
     Literal,
     Protocol,
-    TypeVar,
     Union,
     cast,
     get_args,
@@ -28,9 +27,90 @@ from typing import (
 from dacite import Config, UnionMatchError, from_dict
 
 from parsley.logger import get_parsley_logger
-from parsley.sentinels import is_notfilled, notfilled
+from parsley.sentinels import _NotFilled, is_notfilled, notfilled
 
 parsley_logger = get_parsley_logger()
+
+_UNHANDLED = object()
+
+
+def _handle_literal(data_class: Any, data: Any) -> Any:
+    if get_origin(data_class) is not Literal:
+        return _UNHANDLED
+
+    allowed = get_args(data_class)
+    for literal_value in allowed:
+        if data == literal_value:
+            return data
+        if hasattr(literal_value, "value") and data == literal_value.value:
+            return data
+        if (
+            hasattr(data, "value")
+            and hasattr(literal_value, "value")
+            and data.value == literal_value.value
+        ):
+            return data
+    raise UnionMatchError(field_type=data_class, value=data)
+
+
+def _handle_union(data_class: Any, data: Any, config: Config | None) -> Any:
+    if get_origin(data_class) not in {Union, UnionType}:
+        return _UNHANDLED
+
+    union_types = get_args(data_class)
+    errors: list[str] = []
+    for union_type in union_types:
+        try:
+            parsed = from_dict_with_union_handling(
+                data_class=cast("Any", union_type), data=data, config=config
+            )
+            return parsed
+        except (
+            FieldUnionParsingError,
+            TypeError,
+            UnionMatchError,
+            UnionParsingError,
+            ValueError,
+        ) as inner_error:
+            errors.append(f"Failed with {union_type}: {inner_error}")
+
+    raise UnionParsingError(union_types, errors)
+
+
+def _handle_special_cases(data_class: Any, data: Any) -> Any:
+    if data_class is Any:
+        return data
+
+    if data_class is NoneType:
+        if data is None:
+            return None
+        raise UnionMatchError(field_type=data_class, value=data)
+
+    if data_class is _NotFilled:
+        if is_notfilled(data):
+            return data
+        raise UnionMatchError(field_type=data_class, value=data)
+
+    try:
+        if isinstance(data_class, type) and issubclass(data_class, Enum):
+            if isinstance(data, data_class):
+                return data
+            if isinstance(data, str):
+                return data_class(data)
+            raise UnionMatchError(field_type=data_class, value=data)
+    except TypeError:
+        pass
+
+    if isinstance(data_class, type) and not is_dataclass(data_class):
+        if isinstance(data, data_class):
+            return data
+        try:
+            ctor = cast("Callable[[Any], Any]", data_class)
+            return ctor(data)
+        except (TypeError, ValueError) as exc:
+            raise UnionMatchError(field_type=data_class, value=data) from exc
+
+    return _UNHANDLED
 
 
 class UnionParsingError(Exception):
@@ -226,79 +306,21 @@ def extract_dataclass_types(tp: Any) -> Any:
         yield tp
 
 
-T = TypeVar("T")
-
-
 def from_dict_with_union_handling[T](
     data_class: type[T], data: Any, config: Config | None = None
 ) -> T:
     """Create a dataclass instance while handling unions and literals."""
-    # --- Literal shim ---
-    if get_origin(data_class) is Literal:
-        allowed = get_args(data_class)
-        for literal_value in allowed:
-            if data == literal_value:
-                return cast("T", data)
-            if hasattr(literal_value, "value") and data == literal_value.value:
-                return cast("T", data)
-            if (
-                hasattr(data, "value")
-                and hasattr(literal_value, "value")
-                and data.value == literal_value.value
-            ):
-                return cast("T", data)
-        raise UnionMatchError(field_type=data_class, value=data)
+    literal_result = _handle_literal(data_class, data)
+    if literal_result is not _UNHANDLED:
+        return cast("T", literal_result)
 
-    # --- Handle Union targets BEFORE calling dacite.from_dict ---
-    if get_origin(data_class) in {Union, types.UnionType}:
-        union_types = get_args(data_class)
-        errors: list[str] = []
-        for union_type in union_types:
-            try:
-                parsed = from_dict_with_union_handling(
-                    data_class=cast("Any", union_type), data=data, config=config
-                )
-                return cast("T", parsed)
-            except Exception as inner_error:
-                errors.append(f"Failed with {union_type}: {inner_error}")
+    union_result = _handle_union(data_class, data, config)
+    if union_result is not _UNHANDLED:
+        return cast("T", union_result)
 
-        raise UnionParsingError(union_types, errors) from None
-
-    # --- Base cases for non-dataclass targets ---
-
-    if data_class is Any:
-        return cast("T", data)
-
-    if data_class is type(None):
-        if data is None:
-            return cast("T", cast("object", None))
-        raise UnionMatchError(field_type=data_class, value=data)
-
-    if data_class is type(notfilled):
-        if is_notfilled(data):
-            return cast("T", data)
-        raise UnionMatchError(field_type=data_class, value=data)
-
-    # Enums
-    try:
-        if isinstance(data_class, type) and issubclass(data_class, Enum):
-            if isinstance(data, data_class):
-                return data
-            if isinstance(data, str):
-                return data_class(data)
-            raise UnionMatchError(field_type=data_class, value=data)
-    except TypeError:
-        pass
-
-    # Primitives / normal classes
-    if isinstance(data_class, type) and not is_dataclass(data_class):
-        if isinstance(data, data_class):
-            return cast("T", cast("object", data))
-        try:
-            ctor = cast("Callable[[Any], Any]", data_class)
-            return cast("T", ctor(data))
-        except Exception:
-            raise UnionMatchError(field_type=data_class, value=data) from None
+    base_result = _handle_special_cases(data_class, data)
+    if base_result is not _UNHANDLED:
+        return cast("T", base_result)
 
     # dacite.from_dict expects a mapping for "data"
     if not isinstance(data, Mapping):
@@ -338,7 +360,13 @@ def from_dict_with_union_handling[T](
                             data_dict[field_name] = parsed
                             matched = True
                             break
-                        except Exception as inner_error:
+                        except (
+                            FieldUnionParsingError,
+                            TypeError,
+                            UnionMatchError,
+                            UnionParsingError,
+                            ValueError,
+                        ) as inner_error:
                             field_union_errors.append(
                                 f"Failed with {union_type}: {inner_error}"
                             )
@@ -359,7 +387,13 @@ def from_dict_with_union_handling[T](
                                 data=dict(value),
                                 config=config,
                             )
-                    except Exception as inner_error:
+                    except (
+                        FieldUnionParsingError,
+                        TypeError,
+                        UnionMatchError,
+                        UnionParsingError,
+                        ValueError,
+                    ) as inner_error:
                         field_errors.append(
                             f"Failed to parse nested dataclass field '{field_name}': {inner_error}"
                         )
@@ -466,16 +500,14 @@ def extend_with_config(cls: type[Any]) -> type[Any]:
     original_fields: list[FieldTuple] = []
 
     for f in fields(cls):
-        if f.default is not MISSING or f.default_factory is not MISSING:
+        if f.default is not MISSING:
+            original_fields.append((f.name, f.type, f.default))
+        elif f.default_factory is not MISSING:
             original_fields.append(
                 (
                     f.name,
                     f.type,
-                    (
-                        field(default=f.default)
-                        if f.default is not MISSING
-                        else field(default_factory=f.default_factory)
-                    ),
+                    field(default_factory=f.default_factory),  # pylint: disable=invalid-field-call
                 )
             )
         else:
@@ -487,7 +519,7 @@ def extend_with_config(cls: type[Any]) -> type[Any]:
     extended_fields = (
         non_default_fields
         + default_fields
-        + [("config_file_name", str | None, field(default=None))]
+        + [("config_file_name", str | None, None)]
     )
 
     # Create a new dataclass dynamically
