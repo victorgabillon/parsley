@@ -14,27 +14,61 @@ readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
   { name = "Victor Gabillon", email = "victorgabillon@gmail.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
-    "PyYAML>=6.0.2",
-    "dacite>=1.9.2",
-    "click==8.1.8",
-    "rich"
+  "PyYAML>=6.0.3",
+  "dacite>=1.9.2",
+  "click>=8.3.1",
+  "rich>=14.3.2",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=9.0.2",
+  "pytest-cov>=6.0.0",
+  "coverage",
+  "types-PyYAML>=6.0.12.12",
+]
+
+lint = [
+  "ruff>=0.15.0",
+  "pylint>=4.0.4",
+]
+
+typecheck = [
+  "mypy>=1.19.1",
+  "pyright[nodejs]>=1.1.408",
+]
+
+dev = [
+  "tox>=4.34.1",
+  "pre-commit",
+  "black>=25.12.0",
+
+  # plus include the groups above if you like (or repeat explicitly)
+  "ruff>=0.15.0",
+  "pylint>=4.0.4",
+  "mypy>=1.19.1",
+  "pyright[nodejs]>=1.1.408",
+
+  "build",
+  "twine",
 ]
 
 
-[project.optional-dependencies]
-test = ["pytest>=7.0","types-PyYAML"]
+
 
 [tool.setuptools]
 include-package-data = true
 
+
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
+
 
 
 [tool.setuptools.package-data]
-parsley_coco = [
+parsley = [
   "data/**/*.yaml",
   "py.typed",
 ]
@@ -47,15 +81,10 @@ parsley_coco = [
 
 
 
-[tool.pytest.ini_options]
-testpaths = [
-    "parsley_coco",
-    "tests_parsley"
-]
 
 
 [tool.black]
-target-version = ["py312"]
+target-version = ["py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -67,3 +96,75 @@ exclude = '''
   | dist
 )/
 '''
+
+
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+# Enable import sorting (alphabetical + group order)
+lint.select = ["I", "F", "E", "B", "TCH","UP","SIM", "RUF","RET","N","A","D",
+"ANN", "PERF", "TRY","LOG","RSE","ICN","TID","Q","W",
+"ISC","PIE","ERA","TD"]  # I = imports, F = pyflakes, E = pycodestyle, TCH = type-checking, B = black
+
+# Allow auto-fixing for imports and type-checking imports
+lint.fixable = ["I", "TCH", "F401","UP","SIM","RET","RUF","ERA","D","TRY","B","E"]
+
+# Ignore rules you don't care about
+lint.ignore = [ "E501","PLR0913","ANN401",
+    "D203",  # incompatible with D211
+    "D213",  # incompatible with D212
+]
+
+# Optional: add your first-party package to extend the known group
+[tool.ruff.lint.per-file-ignores]
+# If needed, can add file-specific ignores
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=parsley"
+
+
+#################### TOX ####################
+
+[tool.tox]
+min_version = "4.32.0"
+env_list = ["py313", "lint", "typecheck", "build"]
+isolated_build = true
+
+[tool.tox.env_run_base]
+base_python = ["python3.13"]
+
+[tool.tox.env.py313]
+description = "Run tests"
+extras = ["test"]
+commands = [["pytest", "{posargs}"]]
+
+[tool.tox.env.lint]
+description = "ruff + pylint (fast, no package install)"
+package = "skip"
+deps = ["ruff>=0.15.0", "pylint>=4.0.4"]
+set_env = { PYTHONPATH = "{toxinidir}/src" }
+commands = [
+  ["python", "-m", "ruff", "check", "src", "tests"],
+  ["python", "-m", "ruff", "format", "--check", "src", "tests"],
+  ["python", "-m", "pylint", "src/parsley"],
+]
+
+[tool.tox.env.typecheck]
+description = "mypy + pyright (fast, no package install)"
+package = "skip"
+deps = ["mypy>=1.19.1", "pyright[nodejs]>=1.1.408"]
+set_env = { MYPYPATH = "{toxinidir}/src" }
+commands = [
+  ["python", "-m", "mypy", "--config-file", "pyproject.toml", "src/parsley"],
+  ["python", "-m", "pyright", "src/parsley"],
+]
+
+[tool.tox.env.build]
+deps = ["build"]
+commands = [["python", "-m", "build"]]
+
+#################### END TOX ####################

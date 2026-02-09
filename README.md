@@ -54,7 +54,7 @@ Define your dataclasses and use `create_parsley` to create a parser, then instan
 
 ```python
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 @dataclass
 class Config:
@@ -148,8 +148,8 @@ Consider the following setup:
 #### Code Example
 
 ```python
-from parsley_coco.alternative_dataclasses import make_dataclass_with_optional_paths_and_overwrite, make_partial_dataclass_with_optional_paths
-from parsley_coco.factory import create_parsley
+from parsley.alternative_dataclasses import make_dataclass_with_optional_paths_and_overwrite, make_partial_dataclass_with_optional_paths
+from parsley.factory import create_parsley
 
 parser = create_parsley(Config)
 
@@ -158,7 +158,7 @@ ExtendedConfig = make_partial_dataclass_with_optional_paths(Config)
 
 # Parse arguments
 config = parser.parse_arguments(
-    config_file_path="tests_parsley/yaml_files/config.yaml",
+    config_file_path="tests/yaml_files/config.yaml",
     extra_args=ExtendedConfig(y= "from_extra")
 )
 ```
@@ -245,7 +245,7 @@ To handle this, you need to define your `Config` dataclass to include a field fo
 ```python
 from dataclasses import dataclass
 from typing import Optional
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 @dataclass
 class NestedConfig:
@@ -282,7 +282,7 @@ Suppose you have an Enum for model presets, and each preset has a YAML file desc
 ```python
 from enum import Enum
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 class ModelPreset(str, Enum):
     small = "small"
@@ -340,7 +340,7 @@ If no configuration file is provided, Parsley Coco will instantiate the dataclas
 
 ```python
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 @dataclass
 class Config:
@@ -380,7 +380,7 @@ Parsley Coco integrates seamlessly with `argparse` to handle command-line argume
 
 ```python
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 @dataclass
 class Config:
@@ -468,8 +468,8 @@ This function combines two steps:
 
 ```python
 from dataclasses import dataclass
-from parsley_coco import create_parsley, Parsley
-from parsley_coco.alternative_dataclasses import make_partial_dataclass_with_optional_paths
+from parsley import create_parsley, Parsley
+from parsley.alternative_dataclasses import make_partial_dataclass_with_optional_paths
 
 @dataclass
 class NestedConfig:
@@ -565,7 +565,7 @@ nested_config_path_to_yaml_file: "package://data/nested.yaml"
 #### Code Example
 
 ```python
-from parsley_coco import create_parsley, Parsley
+from parsley import create_parsley, Parsley
 
 @dataclass
 class NestedConfig:

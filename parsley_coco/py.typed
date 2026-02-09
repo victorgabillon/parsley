@@ -1,4 +1,0 @@
-# This file marks parsley_coco as PEP 561 typed.
-# Do not delete: it enables type checkers (mypy, pyright, pylance, ruff)
-# to recognize inline type hints.
-
