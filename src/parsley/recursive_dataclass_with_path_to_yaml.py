@@ -410,6 +410,7 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
         Any: The resolved field value.
 
     """
+
     def _raise_notfilled_yaml_path(field_name: str) -> NoReturn:
         raise NotFilledYamlPathError(field_name)
 

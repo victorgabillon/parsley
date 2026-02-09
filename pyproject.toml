@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80.9.0", "wheel"]
+requires = ["setuptools>=82.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -125,6 +125,31 @@ lint.ignore = [ "E501","PLR0913","ANN401",
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=parsley"
+
+
+
+
+[tool.pylint]
+py-version = "3.13"
+extension-pkg-whitelist = ["PyQt5", "PySide6"]
+
+[tool.pylint.format]
+max-line-length = 88
+
+#[tool.pylint.messages_control]
+disable = [
+    "C0301",
+    "unnecessary-ellipsis",
+    "W0511","R0913","R0917","R0903","R0914","R0912","R0915"
+    ]
+
+
+[tool.pylint.typecheck]
+# Optional: same as init-hook in .pylintrc
+init-hook = "import sys; sys.path.append('.')"
+
+[tool.pylint.design]
+min-public-methods = 1
 
 
 #################### TOX ####################
