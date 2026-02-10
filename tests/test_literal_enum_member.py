@@ -1,12 +1,11 @@
-from dataclasses import dataclass
 import enum
+from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, Union
+from typing import Literal
 
 from dacite import Config
 
 from parsley.utils import from_dict_with_union_handling
-
 
 StrEnum = getattr(enum, "StrEnum", None)
 
@@ -25,7 +24,7 @@ else:
 
 @dataclass
 class UsesLiteralEnumMember:
-    kind: Union[Literal[Kind.A], Literal[Kind.B]]
+    kind: Literal[Kind.A] | Literal[Kind.B]
     x: int
 
 

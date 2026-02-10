@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import yaml
 
@@ -32,13 +32,13 @@ class SubConfigA:
 class SubConfigB:
     discriminator: Literal["B"]
     name: str
-    extra: Optional[str] = None
+    extra: str | None = None
 
 
 @dataclass
 class DeepConfig:
-    preset: Preset | Union[SubConfigA, SubConfigB]
-    sub: Union[SubConfigA, SubConfigB] = field(
+    preset: Preset | SubConfigA | SubConfigB
+    sub: SubConfigA | SubConfigB = field(
         default_factory=lambda: SubConfigA(discriminator="A", value=78945)
     )
     threshold: float = 0.5
@@ -48,7 +48,7 @@ class DeepConfig:
 class RootConfig:
     deep: DeepConfig
     count: int = 1
-    tag: Optional[str] = None
+    tag: str | None = None
 
 
 # --- Test function ---

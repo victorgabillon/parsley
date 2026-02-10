@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
 
-
 from parsley import Parsley, create_parsley
 from parsley.alternative_dataclasses import (
     make_partial_dataclass_with_optional_paths,

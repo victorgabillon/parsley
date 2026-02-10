@@ -53,6 +53,17 @@ class _HasYamlFilePath(Protocol):
         ...
 
 
+class UnresolvedResolvedValError(NameError):
+    """Raised when local variable `resolved_val` was expected to be set but was not."""
+
+    def __init__(self, field: Field[Any], value: Any | None = None) -> None:
+        """Initialize the error with the field and optional value."""
+        msg = f"`resolved_val` was not set while resolving field {field.name}"
+        if value is not None:
+            msg += f" (value={value!r})"
+        super().__init__(msg)
+
+
 class PackageRootRequiredError(ValueError):
     """Raised when a package root is required but not provided."""
 
@@ -398,18 +409,43 @@ def resolve_extended_object_to_dict[T: IsDataclass](
     return resolved_data
 
 
-def _resolve_from_yaml_path(
+def _merge_if_present(
+    base: dict[str, Any], part: dict[str, Any] | None
+) -> dict[str, Any]:
+    if part is None:
+        return base
+    return merge_nested_dicts(base, part)
+
+
+def _history_plus(
+    history: list[str] | None,
+    field_name: str,
+) -> list[str]:
+    return [field_name] if history is None else [*history, field_name]
+
+
+def _resolve_dataclass_from_path(
     *,
-    path_val: Any,
+    field: Field[Any],
     base_field_type: Any,
+    path_val: Any,
     raise_error_with_notfilled: bool,
     package_name: str | None,
     level_of_recursion: int,
 ) -> dict[str, Any] | None:
+    """Case 1: resolve from '{field}_path_to_yaml_file'."""
     if is_notfilled(path_val):
         return None
     if not isinstance(path_val, str):
         raise PathValueTypeError(type(path_val))
+
+    parsley_logger.debug(
+        "%s%s: Attempt   %s from YAML file: %s",
+        " " * (level_of_recursion * 2),
+        level_of_recursion,
+        field.name,
+        path_val,
+    )
 
     return asdict(
         resolve_yaml_file_to_base_dataclass(
@@ -422,108 +458,145 @@ def _resolve_from_yaml_path(
     )
 
 
-def _resolve_from_value(
+def _try_resolve_direct_dataclass_value(
     *,
     field: Field[Any],
-    val: Any,
     base_field_type: Any,
+    val: Any,
     raise_error_with_notfilled: bool,
     history_of_recursive_fields: list[str] | None,
     package_name: str | None,
     level_of_recursion: int,
 ) -> dict[str, Any] | None:
+    """Case 2a: 'val' is a dataclass; try each union arm."""
     if is_notfilled(val):
         return None
+    if not is_dataclass(val):
+        return None
 
-    # direct nested dataclass
+    indent_plus_one: str = " " * (level_of_recursion + 1) * 2
+    dataclass_type_list = extract_union_types(base_field_type)
+
+    resolved_val: dict[str, Any] | None = None
+    for dataclass_type in dataclass_type_list:
+        try:
+            parsley_logger.debug(
+                "%s%s: Attempting %s dataclass %s %s",
+                indent_plus_one,
+                level_of_recursion + 1,
+                field.name,
+                dataclass_type,
+                val,
+            )
+
+            new_history = _history_plus(history_of_recursive_fields, field.name)
+
+            resolved_val_temp = resolve_extended_object_to_dict(
+                extended_obj=cast("IsDataclass", val),
+                base_cls=resolve_type(dataclass_type),
+                raise_error_with_notfilled=raise_error_with_notfilled,
+                history_of_recursive_fields=new_history,
+                package_name=package_name,
+                level_of_recursion=level_of_recursion + 1,
+            )
+            resolved_val_temp = remove_notfilled_values(resolved_val_temp)
+
+            _ = from_dict_with_union_handling(
+                data_class=dataclass_type,
+                data=resolved_val_temp,
+                config=dacite.Config(cast=[Enum]),
+            )
+
+            resolved_val = resolved_val_temp
+            parsley_logger.debug(
+                "%s%s: Success    %s dataclass %s",
+                indent_plus_one,
+                level_of_recursion + 1,
+                field.name,
+                dataclass_type,
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            parsley_logger.debug(
+                "%s%s: Fail       %s dataclass %s",
+                indent_plus_one,
+                level_of_recursion + 1,
+                field.name,
+                dataclass_type,
+            )
+            continue
+
+    if resolved_val is None:
+        raise DataclassUnionResolutionError(field, val)
+    return resolved_val
+
+
+def _try_resolve_yaml_provider_value(
+    *,
+    field: Field[Any],
+    base_field_type: Any,
+    val: Any,
+    raise_error_with_notfilled: bool,
+    package_name: str | None,
+    level_of_recursion: int,
+) -> dict[str, Any] | None:
+    """Case 2b: 'val' has get_yaml_file_path; try each union arm."""
+    if is_notfilled(val):
+        return None
     if is_dataclass(val):
-        dataclass_type_list = extract_union_types(base_field_type)
-        result: dict[str, Any] | None = None
-        for dataclass_type in dataclass_type_list:
-            try:
-                new_history = (
-                    [field.name]
-                    if history_of_recursive_fields is None
-                    else [*history_of_recursive_fields, field.name]
-                )
+        return None  # handled by _try_resolve_direct_dataclass_value
 
-                resolved_val_temp = resolve_extended_object_to_dict(
-                    extended_obj=cast("IsDataclass", val),
-                    base_cls=resolve_type(dataclass_type),
-                    raise_error_with_notfilled=raise_error_with_notfilled,
-                    history_of_recursive_fields=new_history,
-                    package_name=package_name,
-                    level_of_recursion=level_of_recursion + 1,
-                )
-                resolved_val_temp = remove_notfilled_values(resolved_val_temp)
-
-                _ = from_dict_with_union_handling(
-                    data_class=dataclass_type,
-                    data=resolved_val_temp,
-                    config=dacite.Config(cast=[Enum]),
-                )
-            except _PARSE_EXCEPTIONS:
-                continue
-            else:
-                result = resolved_val_temp
-                break
-
-        if result is None:
-            raise DataclassUnionResolutionError(field, val)
-        return result
-
-    # yaml-provider object
     if not hasattr(val, "get_yaml_file_path"):
         raise MissingYamlPathProviderError(field.name, type(val))
 
     dataclass_type_list = extract_union_types(base_field_type)
-    result_: dict[str, Any] | None = None
+    resolved_val: dict[str, Any] | None = None
+
     for dataclass_type in dataclass_type_list:
-        if isinstance(dataclass_type, type) and is_dataclass(dataclass_type):
-            try:
-                provider = cast("_HasYamlFilePath", val)
-                data_class_resolved = resolve_yaml_file_to_base_dataclass(
+        if not (isinstance(dataclass_type, type) and is_dataclass(dataclass_type)):
+            continue
+        try:
+            provider = cast("_HasYamlFilePath", val)
+            resolved_val_temp = asdict(
+                resolve_yaml_file_to_base_dataclass(
                     yaml_path=provider.get_yaml_file_path(),
                     base_cls=resolve_type(dataclass_type),
                     raise_error_with_nones=raise_error_with_notfilled,
                     package_name=package_name,
                     level_of_recursion=level_of_recursion + 1,
                 )
-                resolved_val_temp = asdict(data_class_resolved)
-                _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
-            except _PARSE_EXCEPTIONS:
-                continue
-            else:
-                result_ = resolved_val_temp
-                break
+            )
+            _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
+            resolved_val = resolved_val_temp
+        except Exception:  # pylint: disable=broad-exception-caught
+            parsley_logger.debug("fail %s yaml %s %s", field.name, dataclass_type, val)
+            continue
 
-    if result_ is None:
-        raise YamlBackedUnionResolutionError(field, val)
-    return result_
+    if resolved_val is None:
+        raise UnresolvedResolvedValError(field, val)
+    return resolved_val
 
 
-def _resolve_from_overwrite(
+def _try_resolve_overwrite_value(
     *,
     field: Field[Any],
-    overwrite_val: Any,
     base_field_type: Any,
+    overwrite_val: Any,
     history_of_recursive_fields: list[str] | None,
     package_name: str | None,
     level_of_recursion: int,
 ) -> dict[str, Any] | None:
+    """Case 3: '{field}_overwrite' provided; resolve as partial and merge."""
     if is_notfilled(overwrite_val):
         return None
     if not is_dataclass(overwrite_val):
         raise OverwriteValueTypeError(field.name, type(overwrite_val))
 
     dataclass_type_list = extract_union_types(base_field_type)
+    overwrite_resolved_val: dict[str, Any] | None = None
+
     for dataclass_type in dataclass_type_list:
         try:
-            new_history = (
-                [field.name]
-                if history_of_recursive_fields is None
-                else [*history_of_recursive_fields, field.name]
-            )
+            new_history = _history_plus(history_of_recursive_fields, field.name)
 
             overwrite_resolved_val_temp = resolve_extended_object_to_dict(
                 extended_obj=cast("IsDataclass", overwrite_val),
@@ -533,15 +606,25 @@ def _resolve_from_overwrite(
                 package_name=package_name,
                 level_of_recursion=level_of_recursion + 1,
             )
-            return remove_notfilled_values(overwrite_resolved_val_temp)
-        except _PARSE_EXCEPTIONS:
+            overwrite_resolved_val = remove_notfilled_values(
+                overwrite_resolved_val_temp
+            )
+        except Exception:  # pylint: disable=broad-exception-caught
+            parsley_logger.debug(
+                "fail %s overwrite %s %s",
+                field.name,
+                dataclass_type,
+                overwrite_val,
+            )
             continue
 
-    raise OverwriteUnionResolutionError(field, overwrite_val)
+    if overwrite_resolved_val is None:
+        # behavior consistent with your later assert
+        raise OverwriteUnionResolutionError(field, overwrite_val)
+    return overwrite_resolved_val
 
 
-
-def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
+def resolve_extended_object_to_dict_one_field(
     extended_obj: IsDataclass,
     field: Field[Any],
     raise_error_with_notfilled: bool = True,
@@ -549,248 +632,23 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
     package_name: str | None = None,
     level_of_recursion: int = 0,
 ) -> Any:
-    """Resolve an extended object to a dictionary.
-
-    Raises:
-        NameError: If the field name is not found in the extended object.
-        NameError: If the field type is not found in the extended object.
-        ValueError: If the field value is not valid.
-    """
-
-    result_val: Any
+    """Resolve one field of an extended object to a dictionary value."""
     indent: str = " " * level_of_recursion * 2
-    indent_plus_one: str = " " * (level_of_recursion + 1) * 2
     parsley_logger.debug("%s%s: Resolving  %s", indent, level_of_recursion, field.name)
+
     base_field_type = field.type
     val = getattr(extended_obj, field.name, notfilled)
     path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
     overwrite_val = getattr(extended_obj, f"{field.name}_overwrite", notfilled)
 
-    # assert isinstance(base_field_type, type)
     value_base: bool = not is_notfilled(val)
     value_base = (
         value_base and not is_dataclass(val) and not hasattr(val, "get_yaml_file_path")
     )
 
-    if is_or_contains_dataclass(base_field_type) and not value_base:
-        # assert dataclass_type is not None
-
-        final_resolved_val: dict[str, Any] = {}
-
-        ###### CASE 1: Path to YAML file provided
-        if not is_notfilled(path_val):
-            assert isinstance(path_val, str), (
-                f"path_val must be a str, got {type(path_val)}"
-            )
-            parsley_logger.debug(
-                "%s%s: AAAAAtempt   %s from YAML file: %s",
-                indent,
-                level_of_recursion,
-                field.name,
-                path_val,
-            )
-            resolved_val = asdict(
-                resolve_yaml_file_to_base_dataclass(
-                    yaml_path=path_val,
-                    base_cls=resolve_type(base_field_type),
-                    raise_error_with_nones=raise_error_with_notfilled,
-                    package_name=package_name,
-                    level_of_recursion=level_of_recursion + 1,
-                )
-            )
-            parsley_logger.debug(
-                "%s%s: BBBBAAAAAtempt   %s from YAML file: %s",
-                indent,
-                level_of_recursion,
-                field.name,
-                path_val,
-            )
-            final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
-            parsley_logger.debug(
-                "%s%s: Resolved   %s from YAML file: %s",
-                indent,
-                level_of_recursion,
-                field.name,
-                path_val,
-            )
-
-        ###### CASE 2: Direct value provided
-        if not is_notfilled(val):
-            if is_dataclass(val):
-                dataclass_type_list = extract_union_types(base_field_type)
-
-                for dataclass_type in dataclass_type_list:
-                    try:
-                        parsley_logger.debug(
-                            "%s%s: Attempting %s dataclass %s %s",
-                            indent_plus_one,
-                            level_of_recursion + 1,
-                            field.name,
-                            dataclass_type,
-                            val,
-                        )
-                        if history_of_recursive_fields is None:
-                            new_history__of_recursive_fields = [field.name]
-                        else:
-                            new_history__of_recursive_fields = (
-                                history_of_recursive_fields + [field.name]
-                            )
-
-                        resolved_val_temp = resolve_extended_object_to_dict(
-                            extended_obj=cast(IsDataclass, val),
-                            base_cls=resolve_type(dataclass_type),
-                            raise_error_with_notfilled=raise_error_with_notfilled,
-                            history_of_recursive_fields=new_history__of_recursive_fields,
-                            package_name=package_name,
-                            level_of_recursion=level_of_recursion + 1,
-                        )
-
-                        resolved_val_temp = remove_notfilled_values(resolved_val_temp)
-
-                        _ = from_dict_with_union_handling(
-                            data_class=dataclass_type,
-                            data=resolved_val_temp,
-                            config=dacite.Config(cast=[Enum]),
-                        )
-                        resolved_val = resolved_val_temp
-                        parsley_logger.debug(
-                            "%s%s: Success    %s dataclass %s",
-                            indent_plus_one,
-                            level_of_recursion + 1,
-                            field.name,
-                            dataclass_type,
-                        )
-
-                    except Exception:
-                        # TODO investigate why we can not at the moment use the (TypeError, dacite.exceptions.UnionMatchError) instead of Exception atm.
-                        # problem then encoutnered when doing python chipiron/scripts/main_chipiron.py --script_name one_match
-                        # where the error raised is Exception : An error occurred: wrong value type for field "type" - should be "Literal" instead of value "neural_network" of type "str" ,type: <class 'Exception'>
-                        # so as it is of type Exception we need to catch it as is. Maybe lets try to generate a more pecific error
-                        # at least generate a test that recreates this issue within parsley coco and not in chipiron
-                        # except (TypeError, dacite.exceptions.UnionMatchError):
-
-                        parsley_logger.debug(
-                            "%s%s: Fail       %s dataclass %s",
-                            indent_plus_one,
-                            level_of_recursion + 1,
-                            field.name,
-                            dataclass_type,
-                        )
-                try:
-                    resolved_val
-                    parsley_logger.debug(
-                        "%s%s: Resolved   %s: %s",
-                        indent,
-                        level_of_recursion,
-                        field.name,
-                        resolved_val,
-                    )
-                except NameError as exc:
-                    print(
-                        f"Variable (print) resolved_val is not defined in field {field} {val}"
-                    )
-                    import traceback
-
-                    traceback.print_exc()  # <-- This prints the full traceback
-                    raise NameError(
-                        f"Variable resolved_val is not defined in field {field} with value {val}"
-                    ) from exc
-
-                assert resolved_val is not None, (
-                    f"resolved_val is None in field {field}"
-                )
-            else:  # Non-dataclass value in a Union — allowed
-                assert hasattr(val, "get_yaml_file_path")
-                dataclass_type_list = extract_union_types(base_field_type)
-                for dataclass_type in dataclass_type_list:
-                    if is_dataclass(dataclass_type) and isinstance(
-                        dataclass_type, type
-                    ):
-                        try:
-                            # print('Resolving YAML file for field:', field.name)
-                            resolved_val_temp = asdict(
-                                resolve_yaml_file_to_base_dataclass(
-                                    yaml_path=val.get_yaml_file_path(),
-                                    base_cls=resolve_type(dataclass_type),
-                                    raise_error_with_nones=raise_error_with_notfilled,
-                                    package_name=package_name,
-                                    level_of_recursion=level_of_recursion + 1,
-                                )
-                            )
-                            _ = from_dict(
-                                data_class=dataclass_type, data=resolved_val_temp
-                            )
-                            resolved_val = resolved_val_temp
-                        except Exception:
-                            parsley_logger.debug(
-                                "fail %s yaml %s %s", field.name, dataclass_type, val
-                            )
-                try:
-                    resolved_val
-                except NameError as exc:
-                    print(
-                        f"Variable resolved_val is not defined in field {field} {val}"
-                    )
-                    raise NameError(
-                        f"Variable resolved_val is not defined in field {field}"
-                    ) from exc
-                assert resolved_val is not None
-
-            final_resolved_val = merge_nested_dicts(final_resolved_val, resolved_val)
-
-        ###### CASE 3: Overwrite value provided
-        if not is_notfilled(overwrite_val):
-            assert is_dataclass(overwrite_val)
-            dataclass_type_list = extract_union_types(base_field_type)
-            for dataclass_type in dataclass_type_list:
-                try:
-                    if history_of_recursive_fields is None:
-                        new_history__of_recursive_fields = [field.name]
-                    else:
-                        new_history__of_recursive_fields = (
-                            history_of_recursive_fields + [field.name]
-                        )
-
-                    overwrite_resolved_val_temp = resolve_extended_object_to_dict(
-                        extended_obj=cast(IsDataclass, overwrite_val),
-                        base_cls=make_partial_dataclass_notfilled(dataclass_type),
-                        raise_error_with_notfilled=False,
-                        history_of_recursive_fields=new_history__of_recursive_fields,
-                        package_name=package_name,
-                        level_of_recursion=level_of_recursion + 1,
-                    )
-
-                    overwrite_resolved_val = remove_notfilled_values(
-                        overwrite_resolved_val_temp
-                    )
-
-                except Exception:
-                    parsley_logger.debug(
-                        "fail %s overwrite %s %s",
-                        field.name,
-                        dataclass_type,
-                        overwrite_val,
-                    )
-
-            assert overwrite_resolved_val is not None
-
-            final_resolved_val = merge_nested_dicts(
-                final_resolved_val, overwrite_resolved_val
-            )
-
-        if val is notfilled and path_val is notfilled:
-            if raise_error_with_notfilled:
-                raise ValueError(
-                    f"Exactly one of the fields '{field.name}' or '{field.name}_path_to_yaml_file' must be provided, not neither."
-                )
-
-        result_val = final_resolved_val
-
-    else:
-
+    # Base (non-dataclass) field: return directly (preserving your existing behavior)
+    if not (is_or_contains_dataclass(base_field_type) and not value_base):
         if is_notfilled(val) and raise_error_with_notfilled:
-            import dataclasses
-            import logging
             logger = logging.getLogger("parsley_debug")
             logger.error(
                 "NOTFILLED ASSERT TRIGGERED: cls=%s field=%s level=%s raise_error_with_notfilled=%s val=%r",
@@ -803,9 +661,56 @@ def resolve_extended_object_to_dict_one_field[T_Dataclass: IsDataclass](
             logger.error("extended_obj=%r", extended_obj)
 
         assert not is_notfilled(val) or not raise_error_with_notfilled
-        result_val = val
+        return val
 
-    return result_val
+    # Dataclass-ish field: compute by merging path/value/overwrite
+    final_resolved_val: dict[str, Any] = {}
+
+    part = _resolve_dataclass_from_path(
+        field=field,
+        base_field_type=base_field_type,
+        path_val=path_val,
+        raise_error_with_notfilled=raise_error_with_notfilled,
+        package_name=package_name,
+        level_of_recursion=level_of_recursion,
+    )
+    final_resolved_val = _merge_if_present(final_resolved_val, part)
+
+    part = _try_resolve_direct_dataclass_value(
+        field=field,
+        base_field_type=base_field_type,
+        val=val,
+        raise_error_with_notfilled=raise_error_with_notfilled,
+        history_of_recursive_fields=history_of_recursive_fields,
+        package_name=package_name,
+        level_of_recursion=level_of_recursion,
+    )
+    final_resolved_val = _merge_if_present(final_resolved_val, part)
+
+    part = _try_resolve_yaml_provider_value(
+        field=field,
+        base_field_type=base_field_type,
+        val=val,
+        raise_error_with_notfilled=raise_error_with_notfilled,
+        package_name=package_name,
+        level_of_recursion=level_of_recursion,
+    )
+    final_resolved_val = _merge_if_present(final_resolved_val, part)
+
+    part = _try_resolve_overwrite_value(
+        field=field,
+        base_field_type=base_field_type,
+        overwrite_val=overwrite_val,
+        history_of_recursive_fields=history_of_recursive_fields,
+        package_name=package_name,
+        level_of_recursion=level_of_recursion,
+    )
+    final_resolved_val = _merge_if_present(final_resolved_val, part)
+
+    if val is notfilled and path_val is notfilled and raise_error_with_notfilled:
+        raise MissingValueOrPathError(field.name)
+
+    return final_resolved_val
 
 
 def resolve_extended_object[T: IsDataclass](

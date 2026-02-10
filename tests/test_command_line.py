@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from parsley import create_parsley
 from parsley.logger import get_parsley_logger
 
-
 parsley_logger = get_parsley_logger()
 
 

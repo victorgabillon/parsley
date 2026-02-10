@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parsley-coco"
-version = "0.1.32"
+version = "0.1.34"
 description = "A parser combining dacite and argparse"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
@@ -112,7 +112,7 @@ lint.select = ["I", "F", "E", "B", "TCH","UP","SIM", "RUF","RET","N","A","D",
 lint.fixable = ["I", "TCH", "F401","UP","SIM","RET","RUF","ERA","D","TRY","B","E"]
 
 # Ignore rules you don't care about
-lint.ignore = [ "E501","PLR0913","ANN401",
+lint.ignore = [ "E501","PLR0913","ANN401","TD003","TD002",
     "D203",  # incompatible with D211
     "D213",  # incompatible with D212
 ]

@@ -4,7 +4,6 @@ from parsley.utils import remove_notfilled_values
 
 def test_remove_notfilled_values():
     """Test the creation of the Parsley object."""
-
     dicto = {
         "deep": {
             "sub": {},
