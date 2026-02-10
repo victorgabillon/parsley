@@ -648,18 +648,6 @@ def resolve_extended_object_to_dict_one_field(
 
     # Base (non-dataclass) field: return directly (preserving your existing behavior)
     if not (is_or_contains_dataclass(base_field_type) and not value_base):
-        if is_notfilled(val) and raise_error_with_notfilled:
-            logger = logging.getLogger("parsley_debug")
-            logger.error(
-                "NOTFILLED ASSERT TRIGGERED: cls=%s field=%s level=%s raise_error_with_notfilled=%s val=%r",
-                type(extended_obj),
-                field.name,
-                level_of_recursion,
-                raise_error_with_notfilled,
-                val,
-            )
-            logger.error("extended_obj=%r", extended_obj)
-
         assert not is_notfilled(val) or not raise_error_with_notfilled
         return val
 
