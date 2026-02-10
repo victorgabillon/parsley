@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parsley-coco"
-version = "0.1.34"
+version = "0.1.36"
 description = "A parser combining dacite and argparse"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
