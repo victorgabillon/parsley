@@ -27,29 +27,29 @@ test = [
   "pytest>=9.0.2",
   "pytest-cov>=6.0.0",
   "coverage",
-  "types-PyYAML>=6.0.12.12",
+  "types-PyYAML>=6.0.12.20260518",
 ]
 
 lint = [
-  "ruff>=0.15.0",
-  "pylint>=4.0.4",
+  "ruff>=0.15.20",
+  "pylint>=4.0.6",
 ]
 
 typecheck = [
-  "mypy>=1.19.1",
-  "pyright[nodejs]>=1.1.408",
+  "mypy>=2.1.0",
+  "pyright[nodejs]>=1.1.411",
 ]
 
 dev = [
-  "tox>=4.34.1",
+  "tox>=4.56.1",
   "pre-commit",
-  "black>=25.12.0",
+  "black>=26.5.1",
 
   # plus include the groups above if you like (or repeat explicitly)
-  "ruff>=0.15.0",
-  "pylint>=4.0.4",
-  "mypy>=1.19.1",
-  "pyright[nodejs]>=1.1.408",
+  "ruff>=0.15.20",
+  "pylint>=4.0.6",
+  "mypy>=2.1.0",
+  "pyright[nodejs]>=1.1.411",
 
   "build",
   "twine",
@@ -177,7 +177,7 @@ deps = [
   "click>=8.3.1",
   "rich>=14.3.2",
 
-"ruff>=0.15.0", "pylint>=4.0.4"]
+"ruff>=0.15.20", "pylint>=4.0.6"]
 set_env = { PYTHONPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "ruff", "check", "src"],
@@ -193,8 +193,8 @@ deps = [
   "dacite>=1.9.2",
   "click>=8.3.1",
   "rich>=14.3.2",
-   "types-PyYAML>=6.0.12.12",
-"mypy>=1.19.1", "pyright[nodejs]>=1.1.408"]
+   "types-PyYAML>=6.0.12.20260518",
+"mypy>=2.1.0", "pyright[nodejs]>=1.1.411"]
 set_env = { MYPYPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "mypy", "--config-file", "pyproject.toml", "src/parsley"],
