@@ -11,6 +11,13 @@
 Parsley Coco is a Python library that combines the power of `dacite` and `argparse` to provide a flexible and extensible parser for command-line arguments and configuration files. It supports recursive YAML parsing, dataclass-based argument definitions, and merging of arguments from multiple sources.
 
 
+## Release 0.2.0
+
+This release requires Python 3.14 and resolves deferred annotations before
+building dataclass and CLI schemas. Nested YAML configuration, command-line
+overrides, forward references, and packaged YAML data retain their validated
+behavior. Runtime and development dependencies use the validated toolchain.
+
 ## Features
 
 - **Recursive YAML Parsing**: Parse nested YAML files into Python dataclasses.
@@ -29,7 +36,7 @@ Parsley Coco is a Python library that combines the power of `dacite` and `argpar
 To install the library, use `pip`:
 
 ```bash
-pip install parsley-coco
+pip install parsley-coco==0.2.0
 ```
 
 ## Usage
