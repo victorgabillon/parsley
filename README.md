@@ -1,10 +1,10 @@
 # Parsley Coco
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
+[![Python](https://img.shields.io/badge/Python-3.14-blue)](https://www.python.org)
 [![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Linting: pylint](https://img.shields.io/badge/linting-pylint-yellowgreen)](https://github.com/PyCQA/pylint)
-[![Tests](https://github.com/victorgabillon/chipiron/actions/workflows/ci.yaml/badge.svg)](https://github.com/victorgabillon/chipiron/actions)
+[![Tests](https://github.com/victorgabillon/parsley/actions/workflows/ci.yaml/badge.svg)](https://github.com/victorgabillon/parsley/actions)
 
 ## Overview
 
@@ -22,7 +22,7 @@ Parsley Coco is a Python library that combines the power of `dacite` and `argpar
 
 ## Requirements
 
-- Python 3.12 or higher
+- Python 3.14 or higher
 
 ## Installation
 
@@ -675,3 +675,16 @@ This project is licensed under the [GPL-3.0 License](LICENSE).
 - [dacite](https://github.com/konradhalas/dacite)
 - [argparse](https://docs.python.org/3/library/argparse.html)
 - [PyYAML](https://pyyaml.org/)
+## Python 3.14 development
+
+```bash
+uv venv --python 3.14
+uv pip install -e '.[test,dev]'
+source .venv/bin/activate
+tox
+```
+
+Annotations are resolved with `typing.get_type_hints` before dataclass fields
+are copied or used to generate CLI arguments. This supports deferred annotations
+and existing string forward references without mutating the input dataclass.
+`typing.Union` and `A | B` share Python 3.14's `types.UnionType` representation.

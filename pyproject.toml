@@ -14,7 +14,8 @@ readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
   { name = "Victor Gabillon", email = "victorgabillon@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.14"
+classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.14"]
 dependencies = [
   "PyYAML>=6.0.3",
   "dacite>=1.9.2",
@@ -31,25 +32,25 @@ test = [
 ]
 
 lint = [
-  "ruff>=0.15.20",
-  "pylint>=4.0.6",
+  "ruff==0.15.20",
+  "pylint==4.0.6",
 ]
 
 typecheck = [
-  "mypy>=2.1.0",
-  "pyright[nodejs]>=1.1.411",
+  "mypy==2.1.0",
+  "pyright[nodejs]==1.1.411",
 ]
 
 dev = [
-  "tox>=4.56.1",
+  "tox==4.56.1",
   "pre-commit",
   "black>=26.5.1",
 
   # plus include the groups above if you like (or repeat explicitly)
-  "ruff>=0.15.20",
-  "pylint>=4.0.6",
-  "mypy>=2.1.0",
-  "pyright[nodejs]>=1.1.411",
+  "ruff==0.15.20",
+  "pylint==4.0.6",
+  "mypy==2.1.0",
+  "pyright[nodejs]==1.1.411",
 
   "build",
   "twine",
@@ -84,7 +85,7 @@ parsley = [
 
 
 [tool.black]
-target-version = ["py313"]
+target-version = ["py314"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -101,7 +102,7 @@ exclude = '''
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 
 # Enable import sorting (alphabetical + group order)
 lint.select = ["I", "F", "E", "B", "TCH","UP","SIM", "RUF","RET","N","A","D",
@@ -122,6 +123,10 @@ lint.ignore = [ "E501","PLR0913","ANN401","TD003","TD002",
 # If needed, can add file-specific ignores
 
 
+# Keep public function annotation namespaces available to runtime consumers.
+[tool.ruff.lint.flake8-type-checking]
+exempt-modules = ["typing", "collections.abc", "logging", "pathlib", "argparse"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=parsley"
@@ -130,8 +135,7 @@ addopts = "--cov=parsley"
 
 
 [tool.pylint]
-py-version = "3.13"
-extension-pkg-whitelist = ["PyQt5", "PySide6"]
+py-version = "3.14"
 
 [tool.pylint.format]
 max-line-length = 88
@@ -156,13 +160,13 @@ min-public-methods = 1
 
 [tool.tox]
 min_version = "4.32.0"
-env_list = ["py313", "lint", "typecheck", "build"]
+env_list = ["py314", "lint", "typecheck", "build"]
 isolated_build = true
 
 [tool.tox.env_run_base]
-base_python = ["python3.13"]
+base_python = ["python3.14"]
 
-[tool.tox.env.py313]
+[tool.tox.env.py314]
 description = "Run tests"
 extras = ["test"]
 commands = [["pytest", "{posargs}"]]
@@ -177,7 +181,7 @@ deps = [
   "click>=8.3.1",
   "rich>=14.3.2",
 
-"ruff>=0.15.20", "pylint>=4.0.6"]
+"ruff==0.15.20", "pylint==4.0.6"]
 set_env = { PYTHONPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "ruff", "check", "src"],
@@ -194,7 +198,7 @@ deps = [
   "click>=8.3.1",
   "rich>=14.3.2",
    "types-PyYAML>=6.0.12.20260518",
-"mypy>=2.1.0", "pyright[nodejs]>=1.1.411"]
+"mypy==2.1.0", "pyright[nodejs]==1.1.411"]
 set_env = { MYPYPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "mypy", "--config-file", "pyproject.toml", "src/parsley"],
@@ -206,3 +210,10 @@ deps = ["build"]
 commands = [["python", "-m", "build"]]
 
 #################### END TOX ####################
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+
+[tool.pyright]
+pythonVersion = "3.14"

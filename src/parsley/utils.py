@@ -1,10 +1,11 @@
 """Utility functions for various operations."""
 
 import argparse
-import types  # Import types to handle new-style Union
 from collections.abc import Mapping
+from copy import copy
 from dataclasses import (
     MISSING,
+    Field,
     field,
     fields,
     is_dataclass,
@@ -17,7 +18,6 @@ from typing import (
     ClassVar,
     Literal,
     Protocol,
-    Union,
     cast,
     get_args,
     get_origin,
@@ -119,7 +119,7 @@ def is_or_contains_dataclass(tp: Any) -> bool:
     if is_dataclass(tp):
         return True
 
-    if origin in (Union, UnionType):
+    if origin is UnionType:
         return any(is_or_contains_dataclass(arg) for arg in args)
 
     if origin in (list, tuple, set, dict):
@@ -132,7 +132,7 @@ def extract_union_types(tp: Any) -> Any | list[Any]:
     """Return the list of union member types (or a list with the type itself)."""
     origin = get_origin(tp)
 
-    if origin in (Union, UnionType):
+    if origin is UnionType:
         return list(get_args(tp))
 
     return [tp]
@@ -163,7 +163,7 @@ def is_optional_type(t: Any) -> bool:
     origin = get_origin(t)
     args = get_args(t)
 
-    return (origin is Union or isinstance(t, types.UnionType)) and type(None) in args
+    return (origin is UnionType) and type(None) in args
 
 
 def print_dataclass_schema(cls: Any, indent: int = 0, seen: Any = None) -> None:
@@ -211,7 +211,7 @@ def get_pretty_type(tp: Any) -> str:
             return tp.__name__
         return str(tp)
 
-    if origin in {Union, types.UnionType}:
+    if origin is UnionType:
         return " | ".join(get_pretty_type(arg) for arg in args)
 
     if hasattr(origin, "__name__"):
@@ -224,7 +224,7 @@ def extract_dataclass_types(tp: Any) -> Any:
     origin = get_origin(tp)
     args = get_args(tp)
 
-    if origin in {Union, types.UnionType} or origin in (list, tuple, set, dict):
+    if origin is UnionType or origin in (list, tuple, set, dict):
         for arg in args:
             yield from extract_dataclass_types(arg)
     elif is_dataclass(tp):
@@ -254,7 +254,7 @@ def _from_dict_with_union_handling_impl(
         raise UnionMatchError(field_type=data_class, value=data)
 
     # --- Union targets ---
-    if get_origin(data_class) in {Union, types.UnionType}:
+    if get_origin(data_class) is UnionType:
         union_types = get_args(data_class)
         errors: list[str] = []
         for union_type in union_types:
@@ -300,7 +300,7 @@ def _from_dict_with_union_handling_impl(
             return data
         try:
             return data_class(data)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             raise UnionMatchError(field_type=data_class, value=data) from None
 
     # dacite.from_dict expects a mapping
@@ -323,7 +323,7 @@ def _from_dict_with_union_handling_impl(
                 if field_name not in data_dict:
                     continue
 
-                if get_origin(field_type) in {Union, types.UnionType}:
+                if get_origin(field_type) is UnionType:
                     union_types = get_args(field_type)
                     field_union_errors: list[str] = []
                     matched = False
@@ -417,7 +417,7 @@ def resolve_type(typ: Any) -> Any:
     """Resolve a type by removing optional/notfilled wrappers when possible."""
     origin = get_origin(typ)
 
-    if origin in (Union, UnionType):
+    if origin is UnionType:
         args = [
             arg for arg in get_args(typ) if arg not in (type(None), type(notfilled))
         ]
@@ -429,17 +429,20 @@ def resolve_type(typ: Any) -> Any:
 
 
 # --- Helper to flatten dataclass fields ---
-def flatten_fields(cls: type[Any], prefix: str = "") -> dict[str, Any]:
+def flatten_fields(cls: type[Any], prefix: str = "") -> dict[str, Field[Any]]:
     """Flatten dataclass fields into dotted-name mappings."""
-    flat_fields = {}
+    flat_fields: dict[str, Field[Any]] = {}
+    hints = get_type_hints(cls)
     for f in fields(cls):
-        field_type = f.type
+        field_type = hints[f.name]
         full_name = f"{prefix}{f.name}" if prefix else f.name
         if is_or_contains_dataclass(field_type):
             for sub_type in extract_dataclass_types(field_type):
                 flat_fields.update(flatten_fields(sub_type, prefix=full_name + "."))
         else:
-            flat_fields[full_name] = f
+            resolved_field = copy(f)
+            resolved_field.type = field_type
+            flat_fields[full_name] = resolved_field
     return flat_fields
 
 
@@ -458,7 +461,7 @@ def add_arguments_from_dataclass(
         )
 
 
-FieldTuple = (
+type FieldTuple = (
     tuple[str, Any] | tuple[str, Any, Any]  # (name, type)  # (name, type, field spec)
 )
 
@@ -467,13 +470,14 @@ def extend_with_config(cls: type[Any]) -> type[Any]:
     """Return a dataclass that adds a config_file_name field to the original."""
     # Extract existing fields
     original_fields: list[FieldTuple] = []
+    hints = get_type_hints(cls)
 
     for f in fields(cls):
         if f.default is not MISSING or f.default_factory is not MISSING:
             original_fields.append(
                 (
                     f.name,
-                    f.type,
+                    hints[f.name],
                     (
                         field(default=f.default)  # pylint: disable=invalid-field-call
                         if f.default is not MISSING
@@ -482,7 +486,7 @@ def extend_with_config(cls: type[Any]) -> type[Any]:
                 )
             )
         else:
-            original_fields.append((f.name, f.type))  # non-default
+            original_fields.append((f.name, hints[f.name]))  # non-default
 
     # Add the new one
     non_default_fields = [f for f in original_fields if len(f) == 2]
@@ -495,4 +499,9 @@ def extend_with_config(cls: type[Any]) -> type[Any]:
 
     # Create a new dataclass dynamically
 
-    return make_dataclass(cls.__name__ + "WithConfig", extended_fields, bases=(cls,))
+    return make_dataclass(
+        cls.__name__ + "WithConfig",
+        extended_fields,
+        bases=(cls,),
+        module=cls.__module__,
+    )

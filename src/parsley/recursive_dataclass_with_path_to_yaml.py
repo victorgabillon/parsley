@@ -2,11 +2,11 @@
 
 import logging
 import os
-import types
 from dataclasses import Field, asdict, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, Union, cast, get_args, get_origin
+from types import UnionType
+from typing import Any, Protocol, cast, get_args, get_origin
 
 import dacite
 import yaml
@@ -361,8 +361,8 @@ def extract_dataclass_type(t: Any) -> type | None:
         assert isinstance(t, type)
         return t
     origin = get_origin(t)
-    # Handle typing.Union and PEP 604 (Python 3.10+) unions
-    if origin is Union or isinstance(t, types.UnionType):
+    # Python 3.14 uses UnionType for both union spellings.
+    if origin is UnionType:
         for arg in get_args(t):
             if isinstance(arg, type) and is_dataclass(arg):
                 return arg

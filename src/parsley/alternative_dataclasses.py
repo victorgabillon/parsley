@@ -9,7 +9,6 @@ from types import UnionType
 from typing import (
     Any,
     Literal,
-    Union,
     get_args,
     get_origin,
     get_type_hints,
@@ -42,8 +41,8 @@ def replace_nested_types(tp: Any, transform_fn: Callable[[Any], Any]) -> Any:
     if is_dataclass(tp):
         return transform_fn(tp)
 
-    # Handle Union (typing.Union or new-style A | B)
-    if origin in (Union, UnionType):
+    # Python 3.14 unifies typing.Union and types.UnionType.
+    if origin is UnionType:
         if not args:
             return tp
         transformed_args = [replace_nested_types(arg, transform_fn) for arg in args]
@@ -128,7 +127,9 @@ def make_dataclass_with_optional_paths_and_overwrite(
                     required_fields.append((f.name, transformed_type))
 
     new_cls_name = cls.__name__ + "_WithOptionalPath"
-    new_cls = make_dataclass(new_cls_name, required_fields + optional_fields)
+    new_cls = make_dataclass(
+        new_cls_name, required_fields + optional_fields, module=cls.__module__
+    )
     _processed[cls] = new_cls
     return new_cls
 
@@ -146,7 +147,7 @@ def transform_type_for_partial(tp: Any) -> Any:
         return make_partial_dataclass(tp) | None
 
     # case Union[...] or A | B
-    if origin in (Union, UnionType):
+    if origin is UnionType:
         new_args = []
         for arg in args:
             if isinstance(arg, type) and is_dataclass(arg):
@@ -162,9 +163,6 @@ def transform_type_for_partial(tp: Any) -> Any:
 
     # Other types (List, Dict, etc.) — no recursion here unless needed
     return tp | None
-
-
-_partial_cache = {}
 
 
 def make_partial_dataclass(cls: type[Any]) -> type[Any]:
@@ -186,8 +184,9 @@ def make_partial_dataclass(cls: type[Any]) -> type[Any]:
         partial_fields.append((f.name, transformed_type, None))
 
     new_cls_name = f"Partial{cls.__name__}"
-    partial_cls = make_dataclass(new_cls_name, partial_fields, kw_only=True)
-    partial_cls.__module__ = cls.__module__
+    partial_cls = make_dataclass(
+        new_cls_name, partial_fields, kw_only=True, module=cls.__module__
+    )
 
     _partial_cache[cls] = partial_cls
     return partial_cls
@@ -206,7 +205,7 @@ def transform_type_for_notfilled(tp: Any) -> Any:
         return make_partial_dataclass_notfilled(tp) | _NotFilled
 
     # If this is a Union, recurse on each arg and add _NotFilled to the mix
-    if origin in (Union, UnionType):
+    if origin is UnionType:
         new_args = [transform_type_for_notfilled(arg) for arg in args]
         if not new_args:
             return _NotFilled
@@ -243,8 +242,9 @@ def make_partial_dataclass_notfilled(cls: type[Any]) -> type[Any]:
         partial_fields.append((f.name, transformed_type, notfilled))
 
     new_cls_name = f"Partial{cls.__name__}_NotFilled"
-    partial_cls = make_dataclass(new_cls_name, partial_fields, kw_only=True)
-    partial_cls.__module__ = cls.__module__
+    partial_cls = make_dataclass(
+        new_cls_name, partial_fields, kw_only=True, module=cls.__module__
+    )
 
     _partial_cache[cls] = partial_cls
     return partial_cls
