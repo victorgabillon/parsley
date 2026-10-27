@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=82.0.0", "wheel"]
+requires = ["setuptools>=84.2.1", "wheel>=0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -19,41 +19,41 @@ classifiers = ["Programming Language :: Python :: 3", "Programming Language :: P
 dependencies = [
   "PyYAML>=6.0.3",
   "dacite>=1.9.2",
-  "click>=8.3.1",
-  "rich>=14.3.2",
+  "click>=8.5.0",
+  "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
 test = [
-  "pytest>=9.0.2",
-  "pytest-cov>=6.0.0",
-  "coverage",
-  "types-PyYAML>=6.0.12.20260518",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "coverage==7.17.0",
+  "types-PyYAML==6.0.12.20260906",
 ]
 
 lint = [
-  "ruff==0.15.20",
-  "pylint==4.0.6",
+  "ruff==0.17.3",
+  "pylint==4.1.3",
 ]
 
 typecheck = [
-  "mypy==2.1.0",
-  "pyright[nodejs]==1.1.411",
+  "mypy==2.4.0",
+  "pyright[nodejs]==1.1.414",
 ]
 
 dev = [
-  "tox==4.56.1",
-  "pre-commit",
-  "black>=26.5.1",
+  "tox==4.67.2",
+  "pre-commit==4.7.0",
+  "black==26.10.1",
 
   # plus include the groups above if you like (or repeat explicitly)
-  "ruff==0.15.20",
-  "pylint==4.0.6",
-  "mypy==2.1.0",
-  "pyright[nodejs]==1.1.411",
+  "ruff==0.17.3",
+  "pylint==4.1.3",
+  "mypy==2.4.0",
+  "pyright[nodejs]==1.1.414",
 
-  "build",
-  "twine",
+  "build==1.6.1",
+  "twine==7.0.0",
 ]
 
 
@@ -105,12 +105,12 @@ line-length = 88
 target-version = "py314"
 
 # Enable import sorting (alphabetical + group order)
-lint.select = ["I", "F", "E", "B", "TCH","UP","SIM", "RUF","RET","N","A","D",
+lint.select = ["I", "F", "E", "B", "TC","UP","SIM", "RUF","RET","N","A","D",
 "ANN", "PERF", "TRY","LOG","RSE","ICN","TID","Q","W",
 "ISC","PIE","ERA","TD"]  # I = imports, F = pyflakes, E = pycodestyle, TCH = type-checking, B = black
 
 # Allow auto-fixing for imports and type-checking imports
-lint.fixable = ["I", "TCH", "F401","UP","SIM","RET","RUF","ERA","D","TRY","B","E"]
+lint.fixable = ["I", "TC", "F401","UP","SIM","RET","RUF","ERA","D","TRY","B","E"]
 
 # Ignore rules you don't care about
 lint.ignore = [ "E501","PLR0913","ANN401","TD003","TD002",
@@ -159,7 +159,7 @@ min-public-methods = 1
 #################### TOX ####################
 
 [tool.tox]
-min_version = "4.32.0"
+min_version = "4.67.2"
 env_list = ["py314", "lint", "typecheck", "build"]
 isolated_build = true
 
@@ -178,10 +178,10 @@ deps = [
   
   "PyYAML>=6.0.3",
   "dacite>=1.9.2",
-  "click>=8.3.1",
-  "rich>=14.3.2",
+  "click>=8.5.0",
+  "rich>=15.0.0",
 
-"ruff==0.15.20", "pylint==4.0.6"]
+"ruff==0.17.3", "pylint==4.1.3"]
 set_env = { PYTHONPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "ruff", "check", "src"],
@@ -195,10 +195,10 @@ package = "skip"
 deps = [
   "PyYAML>=6.0.3",
   "dacite>=1.9.2",
-  "click>=8.3.1",
-  "rich>=14.3.2",
-   "types-PyYAML>=6.0.12.20260518",
-"mypy==2.1.0", "pyright[nodejs]==1.1.411"]
+  "click>=8.5.0",
+  "rich>=15.0.0",
+   "types-PyYAML==6.0.12.20260906",
+"mypy==2.4.0", "pyright[nodejs]==1.1.414"]
 set_env = { MYPYPATH = "{toxinidir}/src" }
 commands = [
   ["python", "-m", "mypy", "--config-file", "pyproject.toml", "src/parsley"],
@@ -206,7 +206,7 @@ commands = [
 ]
 
 [tool.tox.env.build]
-deps = ["build"]
+deps = ["build==1.6.1"]
 commands = [["python", "-m", "build"]]
 
 #################### END TOX ####################
