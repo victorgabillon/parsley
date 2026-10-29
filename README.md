@@ -11,12 +11,49 @@
 Parsley Coco is a Python library that combines the power of `dacite` and `argparse` to provide a flexible and extensible parser for command-line arguments and configuration files. It supports recursive YAML parsing, dataclass-based argument definitions, and merging of arguments from multiple sources.
 
 
-## Release 0.2.0
+## Release 0.3.0
 
-This release requires Python 3.14 and resolves deferred annotations before
-building dataclass and CLI schemas. Nested YAML configuration, command-line
-overrides, forward references, and packaged YAML data retain their validated
-behavior. Runtime and development dependencies use the validated toolchain.
+Python 3.14 remains required. This release includes the E1 correctness fixes,
+E2a CLI composition APIs, and E2b configuration construction changes.
+
+- Malformed top-level or nested YAML raises a contextual configuration error
+  containing the path, with the original YAML exception as its cause.
+- Boolean CLI values accept case-insensitive `true`/`false` and `1`/`0`.
+  Other tokens, including `yes`/`no` and `on`/`off`, produce an argparse error;
+  the existing `--field VALUE` syntax is unchanged.
+- Generated partial schemas keep separate cache identities for `None` and
+  `notfilled` defaults, independent of call order.
+- `parse_arguments(..., argv=...)` accepts explicit tokens independently of
+  `sys.argv`; `[]` means no CLI input. `strict=True` rejects unknown CLI tokens.
+  Permissive parsing remains the default, and `parse_known_arguments(...)`
+  returns `(configuration, remaining_arguments)` for composed applications.
+- Required fields can be supplied through CLI, YAML, programmatic input, or
+  their combination. Sources are composed before final user dataclasses are
+  constructed; root and nested `__post_init__` hooks run once per final object.
+- Omitted fields use declared defaults or needed factories once per parse.
+  Supplied objects and mutable defaults are isolated between parses.
+
+Precedence remains `extra_args > CLI > YAML > dataclass defaults`. Explicit null,
+supported presets, YAML references, overwrites, discriminated unions, packaged
+YAML, and Python 3.14 annotation resolution are retained. Dependencies are unchanged.
+
+**Compatibility changes:** missing required values now raise
+`dacite.MissingValueError` with field context; the legacy
+`ArgsDataclassDefaultsError` import remains available. A nullable annotation
+without a declared default is still required. Supplied nested mappings use the
+nested type's defaults and skip the parent factory, removing the old difference
+between partial CLI and YAML input. Already constructed factory values are copied
+without reinitialization. Such values containing unresolved presets now raise
+`UnresolvedDefaultError`; use a dataclass type factory or return a resolved value.
+Selected constructor validation errors propagate instead of retrying union arms,
+and `init=False` fields retain normal dataclass initialization behavior.
+
+**Remaining limits:** no new aliases, boolean-switch syntax, collection/Literal/
+union schemas, recursive CLI schemas, required `InitVar` or custom constructor
+parameters, or provenance system. Strict mode only validates CLI arguments.
+See [CLI composition](#explicit-argv-and-cli-composition) and
+[construction and factories](#configuration-construction-and-factories) for
+public signatures, examples, disabled-CLI behavior, and migration details.
 
 ## Features
 
@@ -36,7 +73,7 @@ behavior. Runtime and development dependencies use the validated toolchain.
 To install the library, use `pip`:
 
 ```bash
-pip install parsley-coco==0.2.0
+python -m pip install parsley-coco==0.3.0
 ```
 
 ## Usage
