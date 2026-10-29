@@ -397,16 +397,18 @@ def remove_none_values(d: dict[Any, Any]) -> dict[Any, Any]:
     return result
 
 
-def remove_notfilled_values(d: dict[Any, Any]) -> dict[Any, Any]:
-    """Recursively remove keys with None values from a nested dictionary."""
+def remove_notfilled_values(
+    d: dict[Any, Any], *, keep_empty: bool = False
+) -> dict[Any, Any]:
+    """Remove sentinel values, optionally retaining explicitly supplied mappings."""
     if not isinstance(d, dict):
         return d  # Leave non-dict values untouched
 
     result = {}
     for k, v in d.items():
         if isinstance(v, dict):
-            nested = remove_notfilled_values(v)
-            if nested:  # Only keep non-empty dicts
+            nested = remove_notfilled_values(v, keep_empty=keep_empty)
+            if nested or keep_empty:
                 result[k] = nested
         elif not is_notfilled(v):
             result[k] = v
