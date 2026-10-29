@@ -9,6 +9,8 @@ Classes:
 """
 
 import os
+import sys
+from collections.abc import Sequence
 from dataclasses import asdict
 from enum import Enum
 from typing import Any
@@ -68,8 +70,10 @@ class Parsley[T: IsDataclass]:
             Parse the command line arguments using the parser object.
         parse_config_file_arguments(self, config_file_path: str) -> None:
             Parse the config file arguments from the specified config file.
-        parse_arguments(self, base_experiment_output_folder: path, extra_args: dict[str, Any] | None = None) -> dict[str, Any]:
+        parse_arguments(self, extra_args=None, config_file_path=None, *, argv=None, strict=False) -> T:
             Parse the command line arguments, config file arguments, and extra arguments.
+        parse_known_arguments(self, extra_args=None, config_file_path=None, *, argv=None) -> tuple[T, list[str]]:
+            Parse configuration and return unconsumed command line arguments.
         log_parser_info(self, output_folder: str) -> None:
             Log the parser information to a file.
 
@@ -109,15 +113,36 @@ class Parsley[T: IsDataclass]:
         self.merged_args = None
 
     def parse_command_line_arguments(
-        self, args: dict[str, Any] | None = None
+        self, args: Sequence[str] | None = None, *, strict: bool = False
     ) -> dict[str, Any]:
         """Parse the command line arguments using the parser object.
+
+        Args:
+            args: Tokens without the program name; None reads sys.argv[1:].
+                An empty sequence supplies no tokens. The sequence is not modified.
+            strict: Reject unknown CLI tokens with argparse's normal error handling.
+                By default, unknown tokens are discarded for compatibility.
+
+        This lower-level method explicitly parses CLI tokens even when
+        should_parse_command_line_arguments is False.
 
         Returns:
             dict[str, Any]: A dictionary containing the parsed command line arguments.
 
         """
-        args_obj, _ = self.parser.parse_known_args(args=args)
+        parsed, _ = self._parse_command_line_arguments(args, strict=strict)
+        return parsed
+
+    def _parse_command_line_arguments(
+        self, args: Sequence[str] | None, *, strict: bool = False
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Parse and resolve CLI tokens once, retaining argparse's remainder."""
+        tokens = None if args is None else list(args)
+        if strict:
+            args_obj = self.parser.parse_args(args=tokens)
+            remaining: list[str] = []
+        else:
+            args_obj, remaining = self.parser.parse_known_args(args=tokens)
 
         args_command_line = vars(args_obj)  # converting into dictionary format
         args_command_line_without_none: dict[str, Any] = {
@@ -134,7 +159,7 @@ class Parsley[T: IsDataclass]:
             raise_error_with_nones=False,
         )
 
-        return remove_notfilled_values(d=parsed_command_line_dict)
+        return remove_notfilled_values(d=parsed_command_line_dict), remaining
 
     def parse_config_file_arguments(self, config_file_path: str) -> None:
         """Parse arguments from a YAML config file.
@@ -256,13 +281,26 @@ class Parsley[T: IsDataclass]:
         return dataclass_args_final
 
     def parse_arguments(
-        self, extra_args: IsDataclass | None = None, config_file_path: str | None = None
+        self,
+        extra_args: IsDataclass | None = None,
+        config_file_path: str | None = None,
+        *,
+        argv: Sequence[str] | None = None,
+        strict: bool = False,
     ) -> T:
         """Parse the command line arguments, config file arguments, and extra arguments.
 
         Args:
             extra_args (IsDataclass | None): Extra dataclass arguments to merge.
             config_file_path (str | None): Optional YAML config file path.
+            argv: CLI tokens without the program name. None uses sys.argv[1:];
+                an empty sequence parses no tokens. Neither input is modified.
+            strict: Reject unknown CLI tokens via argparse. Defaults to False;
+                YAML and dictionary-key validation are unaffected.
+
+        If should_parse_command_line_arguments is False, argv and strict are
+        ignored, including help and invalid CLI tokens. YAML and extra_args
+        still apply. Help normally exits with status 0; CLI errors exit with 2.
 
         Returns:
             T_Dataclass: The merged dataclass arguments.
@@ -270,7 +308,9 @@ class Parsley[T: IsDataclass]:
         """
         args_command_line: dict[str, Any]
         if self.should_parse_command_line_arguments:
-            args_command_line = self.parse_command_line_arguments()
+            args_command_line = self.parse_command_line_arguments(
+                args=argv, strict=strict
+            )
         else:
             args_command_line = {}
 
@@ -279,6 +319,44 @@ class Parsley[T: IsDataclass]:
             config_file_path=config_file_path,
             args_command_line=args_command_line,
         )
+
+    def parse_known_arguments(
+        self,
+        extra_args: IsDataclass | None = None,
+        config_file_path: str | None = None,
+        *,
+        argv: Sequence[str] | None = None,
+    ) -> tuple[T, list[str]]:
+        """Return typed configuration and unconsumed CLI tokens in argparse order.
+
+        Args:
+            extra_args: Extra dataclass arguments, with the highest precedence.
+            config_file_path: Optional YAML config file path.
+            argv: Tokens without the program name. None uses sys.argv[1:];
+                an empty sequence parses no tokens. Neither input is modified.
+
+        Known tokens are parsed once and the existing merge pipeline runs once.
+        Help and invalid known values retain argparse's normal exits (0 and 2).
+        When should_parse_command_line_arguments is False, no CLI tokens are
+        interpreted and all supplied tokens (or sys.argv[1:]) are returned in
+        a fresh list. YAML and extra_args still apply.
+
+        Returns:
+            A configuration and a list of remaining arguments for another parser.
+
+        """
+        if self.should_parse_command_line_arguments:
+            args_command_line, remaining = self._parse_command_line_arguments(argv)
+        else:
+            args_command_line = {}
+            remaining = list(sys.argv[1:] if argv is None else argv)
+
+        configuration = self.parse_arguments_with_command_line_args(
+            extra_args=extra_args,
+            config_file_path=config_file_path,
+            args_command_line=args_command_line,
+        )
+        return configuration, remaining
 
     def log_parser_info(self, output_folder: str) -> None:
         """Log the parser information to a file.
