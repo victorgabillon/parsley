@@ -98,7 +98,7 @@ The `parse_arguments` method of the `Parsley` parser parses arguments from multi
 - **Arguments**:
   1. **`extra_args`** (optional):
      - A dataclass instance or dictionary containing additional arguments.
-     - These arguments are merged with other sources and take precedence over YAML but are overridden by command-line arguments.
+     - These arguments take precedence over command-line arguments, YAML, and dataclass defaults.
   2. **`config_file_path`** (optional):
      - A string specifying the path to a YAML configuration file.
      - If not provided, the parser looks for a `config_file_name` key in `extra_args` or command-line arguments.
@@ -231,6 +231,12 @@ This will be parsed as `Config(option=42)`.
 Always include a `discriminator` field (using `Literal[...]`) in each dataclass used in a union. This ensures robust and predictable parsing, especially when your configuration can match multiple types.
 
 ### Recursive YAML Parsing
+
+A requested YAML file with invalid syntax raises
+`parsley.parser.ConfigFileProcessingError`, including the offending file path
+and chaining the original `yaml.YAMLError` as `__cause__`. This also applies
+to nested YAML references and presets; malformed files never silently fall
+back to dataclass defaults. Omitting a configuration file still uses defaults.
 
 Parsley Coco supports recursive YAML parsing. For example:
 
@@ -374,12 +380,12 @@ By designing your dataclass with defaults, you make your application more robust
 
 ### Command-Line Arguments Handling
 
-Parsley Coco integrates seamlessly with `argparse` to handle command-line arguments. Command-line arguments take the highest priority when merging configurations from multiple sources (e.g., YAML files, `extra_args`, and defaults).
+Parsley Coco integrates with `argparse` to handle command-line arguments. The precedence order is `extra_args > CLI > YAML > dataclass defaults`.
 
 #### How It Works
 
 1. **Automatic Argument Parsing**: Parsley Coco automatically generates command-line arguments based on the fields in your dataclass.
-2. **Priority**: Command-line arguments override values from YAML files, `extra_args`, and default values in the dataclass.
+2. **Priority**: Command-line arguments override YAML and dataclass defaults. Values in `extra_args` override command-line arguments.
 3. **Type Safety**: The types of the arguments are inferred from the dataclass fields, ensuring type safety.
 
 #### Example
@@ -418,6 +424,19 @@ Config(x=42, y="hello world")
 1. **Automatic Argument Names**: The argument names are derived from the field names in the dataclass (e.g., `x` becomes `--x`).
 2. **Type Conversion**: Parsley Coco automatically converts the command-line arguments to the appropriate types based on the dataclass field types.
 3. **Help Message**: A help message is automatically generated for the command-line arguments.
+
+#### Boolean Values
+
+Boolean fields keep the `--field VALUE` syntax, including nested fields such as
+`--child.enabled false` and optional `bool | None` fields. Accepted tokens are
+case-insensitive `true` and `1` for `True`, and `false` and `0` for `False`.
+Other tokens (including `yes`, `no`, `on`, `off`, `none`, and tokens with surrounding
+whitespace) produce an argparse error. A value is required after the option.
+
+Omitting a boolean option supplies no CLI override, so YAML or dataclass defaults
+still apply. For optional booleans, omission preserves the configured value
+(including `None`); explicit YAML `null` remains supported. Unknown CLI arguments
+continue to be ignored to support layered parsing.
 
 #### Example with YAML and Command-Line Arguments
 
