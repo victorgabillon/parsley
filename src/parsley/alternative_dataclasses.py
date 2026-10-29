@@ -18,6 +18,8 @@ from parsley.sentinels import _NotFilled, notfilled
 from parsley.utils import is_or_contains_dataclass
 
 _partial_cache: dict[type[Any], type[Any]] = {}
+# Defaults and accepted types differ between the two generated schema modes.
+_partial_notfilled_cache: dict[type[Any], type[Any]] = {}
 
 
 class DataclassTypeError(TypeError):
@@ -225,8 +227,8 @@ def transform_type_for_notfilled(tp: Any) -> Any:
 
 def make_partial_dataclass_notfilled(cls: type[Any]) -> type[Any]:
     """Create a partial dataclass where every field defaults to `notfilled`, recursively."""
-    if cls in _partial_cache:
-        return _partial_cache[cls]
+    if cls in _partial_notfilled_cache:
+        return _partial_notfilled_cache[cls]
 
     if not is_dataclass(cls):
         raise DataclassTypeError(cls)
@@ -246,7 +248,7 @@ def make_partial_dataclass_notfilled(cls: type[Any]) -> type[Any]:
         new_cls_name, partial_fields, kw_only=True, module=cls.__module__
     )
 
-    _partial_cache[cls] = partial_cls
+    _partial_notfilled_cache[cls] = partial_cls
     return partial_cls
 
 
