@@ -102,6 +102,10 @@ The `parse_arguments` method of the `Parsley` parser parses arguments from multi
   2. **`config_file_path`** (optional):
      - A string specifying the path to a YAML configuration file.
      - If not provided, the parser looks for a `config_file_name` key in `extra_args` or command-line arguments.
+  3. **`argv`** (keyword-only, optional):
+     - A `Sequence[str]` of CLI tokens without the program name. `None` uses `sys.argv[1:]`; `[]` supplies no tokens.
+  4. **`strict`** (keyword-only, default `False`):
+     - When `True`, unknown CLI arguments produce an argparse error. YAML and dictionary-key validation are unchanged.
 
 - **Returns**:
   - An instance of the dataclass populated with the merged arguments from all sources.
@@ -436,7 +440,86 @@ whitespace) produce an argparse error. A value is required after the option.
 Omitting a boolean option supplies no CLI override, so YAML or dataclass defaults
 still apply. For optional booleans, omission preserves the configured value
 (including `None`); explicit YAML `null` remains supported. Unknown CLI arguments
-continue to be ignored to support layered parsing.
+continue to be ignored by default to support layered parsing.
+
+#### Explicit argv and CLI Composition
+
+The public entrypoints on `Parsley[T]` are:
+
+```python
+parse_arguments(extra_args=None, config_file_path=None, *,
+                argv: Sequence[str] | None = None, strict: bool = False) -> T
+parse_known_arguments(extra_args=None, config_file_path=None, *,
+                      argv: Sequence[str] | None = None) -> tuple[T, list[str]]
+parse_command_line_arguments(args: Sequence[str] | None = None, *,
+                             strict: bool = False) -> dict[str, Any]
+```
+
+`argv` excludes the program name. `None` retains process-command-line behavior;
+`[]` supplies no CLI arguments. An explicit sequence is independent of `sys.argv`.
+Neither the sequence nor `sys.argv` is modified. The existing `args=` keyword and
+dictionary return type on the lower-level method are preserved.
+
+For explicit input, define defaults and pass the tokens directly:
+
+```python
+from dataclasses import dataclass
+from parsley import create_parsley
+
+@dataclass
+class Config:
+    count: int = 1
+    enabled: bool = True
+
+parser = create_parsley(Config)
+config = parser.parse_arguments(argv=["--count", "6", "--enabled", "false"])
+assert config == Config(count=6, enabled=False)
+assert parser.parse_arguments(argv=[]) == Config()
+```
+
+For a standalone command, opt into strict CLI parsing per call:
+
+```python
+config = parser.parse_arguments(argv=["--count", "6"], strict=True)
+# In a script, parser.parse_arguments(strict=True) reads sys.argv[1:].
+# --cout 6 would print an argparse error and exit with status 2.
+```
+
+For a larger application, pass the remainder to another parser without globals:
+
+```python
+import argparse
+from collections.abc import Sequence
+
+def parse_job(argv: Sequence[str]) -> tuple[Config, str]:
+    config, remaining = create_parsley(Config).parse_known_arguments(argv=argv)
+    dispatcher = argparse.ArgumentParser()
+    dispatcher.add_argument("--job", choices=["train", "evaluate"], required=True)
+    return config, dispatcher.parse_args(remaining).job
+
+assert parse_job(["--job", "train", "--count", "6"]) == (Config(count=6), "train")
+```
+
+`parse_known_arguments` retains unconsumed tokens in argparse's returned order
+and invokes the existing configuration merge pipeline once. It does not run a
+second configuration parse to obtain the remainder. Existing argparse option
+abbreviation behavior remains in effect: a recognized prefix can be consumed,
+so use distinct option names across parsing stages.
+
+With `should_parse_command_line_arguments=False`, both high-level methods ignore
+CLI values, help, and errors; YAML and `extra_args` still apply. `parse_arguments`
+also ignores `strict`. `parse_known_arguments` returns all supplied tokens (or
+`sys.argv[1:]` when `argv=None`) unconsumed in a fresh list. Direct calls to the
+lower-level `parse_command_line_arguments` still explicitly parse tokens,
+regardless of that flag, as before.
+
+When CLI parsing is enabled, `--help` prints help and exits with status 0,
+including in parse-known mode. Missing values and invalid known values exit
+with status 2 in every mode; unknown tokens cause an error only with `strict=True`.
+Values and strictness do not carry over between calls. All entrypoints retain
+`extra_args > CLI > YAML > dataclass defaults`; strictness applies only to CLI
+tokens. Required-field/default resolution and repeated dataclass construction
+are unchanged.
 
 #### Example with YAML and Command-Line Arguments
 
