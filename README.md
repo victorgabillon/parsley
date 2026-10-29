@@ -350,7 +350,10 @@ You can use this approach with any class, not just Enums, as long as it provides
 
 ### Default Behavior Without a Config File
 
-If no configuration file is provided, Parsley Coco will instantiate the dataclass using its default arguments. This means that all fields in your dataclass should either have default values or be optional to ensure proper initialization.
+Without a configuration file, Parsley composes CLI and programmatic input and
+then fills omitted fields from dataclass defaults. A root dataclass does not
+need to be default-constructible: required fields can come from any supported
+input source, or from a combination of sources.
 
 #### Example
 
@@ -377,10 +380,90 @@ Config(x=0, y="default")
 ```
 
 #### Key Points:
-1. **Default Values**: Fields in the dataclass should have default values or be optional to avoid errors when no configuration file is provided.
-2. **Fallback Behavior**: This ensures that your application can run with default settings even if no external configuration is supplied.
+1. **Default Values**: Defaults apply only to omitted fields. Explicit YAML `null` or programmatic `None` is preserved and must match the field's type.
+2. **Required Values**: A field still missing after composition raises `dacite.MissingValueError`, with a path such as `child.x`.
 
-By designing your dataclass with defaults, you make your application more robust and user-friendly.
+An annotation such as `x: int | None` permits null but does not declare a
+default. Omission still requires a value; declare `x: int | None = None` to
+allow omission. This makes empty-YAML and no-YAML behavior consistent instead
+of inferring `None` only on the YAML path.
+
+### Configuration Construction and Factories
+
+Parsley resolves supplied YAML references, presets, and overwrites as data,
+combines sources, and selects declared dataclass/union schemas before constructing
+the final objects. It does not instantiate the root just to inspect defaults.
+Each selected user dataclass is constructed once; `__post_init__` runs normally
+on the composed values, including for nested objects. For example:
+
+```python
+@dataclass
+class Required:
+    x: int
+
+assert create_parsley(Required).parse_arguments(argv=["--x", "3"]).x == 3
+
+@dataclass
+class Increment:
+    x: int = 0
+
+    def __post_init__(self):
+        self.x += 1
+
+parser = create_parsley(Increment)
+assert parser.parse_arguments(argv=[]).x == 1
+assert parser.parse_arguments(argv=["--x", "7"]).x == 8
+```
+
+The same construction behavior applies to `parse_known_arguments`,
+`parse_arguments_with_command_line_args`, `resolve_dict_to_base_dataclass`,
+`resolve_yaml_file_to_base_dataclass`, and `resolve_extended_object`.
+Data-only resolution does not run user constructors.
+
+Factory behavior follows field omission:
+
+- An omitted field uses its default or evaluates its `default_factory` once per
+  parse. Supplied fields do not invoke that field's factory.
+- A supplied nested mapping uses the nested type's declared field defaults;
+  it does not evaluate the parent's factory to obtain a template. This applies
+  equally to CLI, YAML, and programmatic input. `{}` supplies a nested mapping;
+  `None` supplies null; an absent field uses the parent's default/factory.
+- A dataclass type used directly as a factory, such as
+  `field(default_factory=Child)`, is constructed after its own defaults and
+  preset references are resolved. An arbitrary callable returning an already
+  constructed dataclass supplies that completed value; Parsley copies it and
+  does not rerun its initialization.
+- Mutable values are copied so hooks and subsequent parses do not mutate
+  supplied objects or share defaults. Programmatic input dataclasses contribute
+  their **current field values** as overrides; the final target's hook still
+  runs once. A caller's earlier initialization is not undone.
+
+Intentional corrections from 0.2.0: root and nested hooks no longer run during
+intermediate passes; partial CLI input no longer evaluates a parent factory
+whose custom values would previously survive only for CLI, but not YAML.
+For example, with `child=field(default_factory=lambda: Child(x=10, y=20))`,
+supplying `child.x` uses `Child`'s declared default for `y`, consistently across
+sources. Supply factory-specific values explicitly when composing such input.
+Fields declared `init=False` are left to normal dataclass initialization and
+`__post_init__`, rather than being overwritten after the hook.
+
+Union selection uses declared types and discriminators without executing user
+constructors as probes. Once selected, a constructor/`__post_init__` exception
+propagates; Parsley does not retry another union arm to hide validation failure.
+Existing contextual YAML errors remain unchanged. The
+`parsley.parser.ArgsDataclassDefaultsError` import remains available for
+compatibility; missing required input now uses `dacite.MissingValueError` after
+composition. Invalid provided values still fail in the schema-validation stage
+(including `FieldUnionParsingError` for generated union schemas).
+
+An arbitrary factory returning an already constructed object with unresolved
+preset references is unsupported: resolving it would require rebuilding an
+object whose hook has already run. This raises
+`parsley.construction.UnresolvedDefaultError`; use the dataclass type itself as
+the factory, or return a fully resolved object. Recursive CLI schemas, required
+`InitVar`/custom constructor arguments outside declared fields, and broader
+dataclass-in-collection/union shapes are not added by this change. The standalone
+generic `from_dict_with_union_handling` utility retains its existing behavior.
 
 ### Command-Line Arguments Handling
 
@@ -518,8 +601,8 @@ including in parse-known mode. Missing values and invalid known values exit
 with status 2 in every mode; unknown tokens cause an error only with `strict=True`.
 Values and strictness do not carry over between calls. All entrypoints retain
 `extra_args > CLI > YAML > dataclass defaults`; strictness applies only to CLI
-tokens. Required-field/default resolution and repeated dataclass construction
-are unchanged.
+tokens. Required values and defaults follow the
+[configuration construction rules](#configuration-construction-and-factories).
 
 #### Example with YAML and Command-Line Arguments
 

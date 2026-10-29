@@ -2,7 +2,7 @@
 
 import logging
 import os
-from dataclasses import Field, asdict, fields, is_dataclass
+from dataclasses import Field, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
 from types import UnionType
@@ -10,12 +10,13 @@ from typing import Any, Protocol, cast, get_args, get_origin
 
 import dacite
 import yaml
-from dacite import DaciteError, UnionMatchError, from_dict
+from dacite import DaciteError, UnionMatchError
 
 from parsley.alternative_dataclasses import (
     make_partial_dataclass_notfilled,
     make_partial_dataclass_with_optional_paths,
 )
+from parsley.construction import build_configuration
 from parsley.errors import ConfigFileProcessingError
 from parsley.logger import get_parsley_logger
 from parsley.sentinels import is_notfilled, notfilled
@@ -434,7 +435,6 @@ def _resolve_dataclass_from_path(
     field: Field[Any],
     base_field_type: Any,
     path_val: Any,
-    raise_error_with_notfilled: bool,
     package_name: str | None,
     level_of_recursion: int,
 ) -> dict[str, Any] | None:
@@ -452,14 +452,11 @@ def _resolve_dataclass_from_path(
         path_val,
     )
 
-    return asdict(
-        resolve_yaml_file_to_base_dataclass(
-            yaml_path=path_val,
-            base_cls=resolve_type(base_field_type),
-            raise_error_with_nones=raise_error_with_notfilled,
-            package_name=package_name,
-            level_of_recursion=level_of_recursion + 1,
-        )
+    return resolve_yaml_file_to_dict_allow_notfilled(
+        yaml_path=path_val,
+        base_cls=resolve_type(base_field_type),
+        raise_error_with_nones=False,
+        package_name=package_name,
     )
 
 
@@ -504,10 +501,12 @@ def _try_resolve_direct_dataclass_value(
                 package_name=package_name,
                 level_of_recursion=level_of_recursion + 1,
             )
-            resolved_val_temp = remove_notfilled_values(resolved_val_temp)
+            resolved_val_temp = remove_notfilled_values(
+                resolved_val_temp, keep_empty=True
+            )
 
             _ = from_dict_with_union_handling(
-                data_class=dataclass_type,
+                data_class=make_partial_dataclass_notfilled(dataclass_type),
                 data=resolved_val_temp,
                 config=dacite.Config(cast=[Enum]),
             )
@@ -542,9 +541,7 @@ def _try_resolve_yaml_provider_value(
     field: Field[Any],
     base_field_type: Any,
     val: Any,
-    raise_error_with_notfilled: bool,
     package_name: str | None,
-    level_of_recursion: int,
 ) -> dict[str, Any] | None:
     """Case 2b: 'val' has get_yaml_file_path; try each union arm."""
     if is_notfilled(val):
@@ -563,16 +560,20 @@ def _try_resolve_yaml_provider_value(
             continue
         try:
             provider = cast("_HasYamlFilePath", val)
-            resolved_val_temp = asdict(
-                resolve_yaml_file_to_base_dataclass(
-                    yaml_path=provider.get_yaml_file_path(),
-                    base_cls=resolve_type(dataclass_type),
-                    raise_error_with_nones=raise_error_with_notfilled,
-                    package_name=package_name,
-                    level_of_recursion=level_of_recursion + 1,
-                )
+            resolved_val_temp = resolve_yaml_file_to_dict_allow_notfilled(
+                yaml_path=provider.get_yaml_file_path(),
+                base_cls=resolve_type(dataclass_type),
+                raise_error_with_nones=False,
+                package_name=package_name,
             )
-            _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
+            resolved_val_temp = remove_notfilled_values(
+                resolved_val_temp, keep_empty=True
+            )
+            _ = dacite.from_dict(
+                data_class=make_partial_dataclass_notfilled(dataclass_type),
+                data=resolved_val_temp,
+                config=dacite.Config(cast=[Enum]),
+            )
             resolved_val = resolved_val_temp
         except ConfigFileProcessingError:
             raise
@@ -616,7 +617,7 @@ def _try_resolve_overwrite_value(
                 level_of_recursion=level_of_recursion + 1,
             )
             overwrite_resolved_val = remove_notfilled_values(
-                overwrite_resolved_val_temp
+                overwrite_resolved_val_temp, keep_empty=True
             )
         except ConfigFileProcessingError:
             raise
@@ -652,6 +653,9 @@ def resolve_extended_object_to_dict_one_field(
     path_val = getattr(extended_obj, f"{field.name}_path_to_yaml_file", notfilled)
     overwrite_val = getattr(extended_obj, f"{field.name}_overwrite", notfilled)
 
+    if all(is_notfilled(value) for value in (val, path_val, overwrite_val)):
+        return notfilled
+
     value_base: bool = not is_notfilled(val)
     value_base = (
         value_base and not is_dataclass(val) and not hasattr(val, "get_yaml_file_path")
@@ -669,7 +673,6 @@ def resolve_extended_object_to_dict_one_field(
         field=field,
         base_field_type=base_field_type,
         path_val=path_val,
-        raise_error_with_notfilled=raise_error_with_notfilled,
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
@@ -690,9 +693,7 @@ def resolve_extended_object_to_dict_one_field(
         field=field,
         base_field_type=base_field_type,
         val=val,
-        raise_error_with_notfilled=raise_error_with_notfilled,
         package_name=package_name,
-        level_of_recursion=level_of_recursion,
     )
     final_resolved_val = _merge_if_present(final_resolved_val, part)
 
@@ -704,12 +705,7 @@ def resolve_extended_object_to_dict_one_field(
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
-    final_resolved_val = _merge_if_present(final_resolved_val, part)
-
-    if val is notfilled and path_val is notfilled and raise_error_with_notfilled:
-        raise MissingValueOrPathError(field.name)
-
-    return final_resolved_val
+    return _merge_if_present(final_resolved_val, part)
 
 
 def resolve_extended_object[T: IsDataclass](
@@ -734,14 +730,21 @@ def resolve_extended_object[T: IsDataclass](
     """
     resolved_data: dict[str, Any] = resolve_extended_object_to_dict(
         extended_obj=extended_obj,
-        base_cls=base_cls,
+        base_cls=make_partial_dataclass_notfilled(base_cls),
         raise_error_with_notfilled=raise_error_with_nones,
         package_name=package_name,
         level_of_recursion=level_of_recursion,
     )
 
-    resolved_data = remove_notfilled_values(resolved_data)
+    resolved_data = remove_notfilled_values(resolved_data, keep_empty=True)
 
-    return from_dict_with_union_handling(
-        data_class=base_cls, data=resolved_data, config=dacite.Config(cast=[Enum])
+    return build_configuration(
+        schema=base_cls,
+        data=resolved_data,
+        resolve_defaults=lambda data, schema: remove_notfilled_values(
+            resolve_extended_dict_to_dict_allow_notfilled(
+                data, schema, raise_error_with_nones=False, package_name=package_name
+            ),
+            keep_empty=True,
+        ),
     )

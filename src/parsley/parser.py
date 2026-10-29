@@ -12,10 +12,8 @@ import os
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict
-from enum import Enum
 from typing import Any
 
-import dacite
 import yaml
 from rich.pretty import pretty_repr
 
@@ -25,6 +23,7 @@ from parsley.alternative_dataclasses import (
 from parsley.errors import ConfigFileProcessingError
 from parsley.logger import get_parsley_logger
 from parsley.recursive_dataclass_with_path_to_yaml import (
+    resolve_dict_to_base_dataclass,
     resolve_extended_dict_to_dict_allow_notfilled,
     resolve_extended_object_to_dict,
     resolve_yaml_file_to_dict_allow_notfilled,
@@ -43,7 +42,7 @@ parsley_logger = get_parsley_logger()
 
 
 class ArgsDataclassDefaultsError(ValueError):
-    """Raised when the args dataclass cannot be instantiated with defaults."""
+    """Legacy error retained for compatibility; missing input now uses MissingValueError."""
 
     def __init__(self, dataclass_type: type[Any]) -> None:
         """Initialize the error for missing dataclass defaults."""
@@ -159,7 +158,9 @@ class Parsley[T: IsDataclass]:
             raise_error_with_nones=False,
         )
 
-        return remove_notfilled_values(d=parsed_command_line_dict), remaining
+        return remove_notfilled_values(
+            d=parsed_command_line_dict, keep_empty=True
+        ), remaining
 
     def parse_config_file_arguments(self, config_file_path: str) -> None:
         """Parse arguments from a YAML config file.
@@ -176,7 +177,9 @@ class Parsley[T: IsDataclass]:
                     raise_error_with_nones=False,
                     package_name=self.package_name,
                 )
-                args_config_file = remove_notfilled_values(d=args_config_file)
+                args_config_file = remove_notfilled_values(
+                    d=args_config_file, keep_empty=True
+                )
                 parsley_logger.info(
                     "Here are the yaml file arguments of the script: %s",
                     args_config_file,
@@ -224,7 +227,9 @@ class Parsley[T: IsDataclass]:
                 package_name=self.package_name,
             )
 
-            extra_args_dict = remove_notfilled_values(d=extra_args_dict)
+            extra_args_dict = remove_notfilled_values(
+                d=extra_args_dict, keep_empty=True
+            )
 
         #  the gui/external input  overwrite  the command line arguments
         #  that will overwrite the config file arguments that will overwrite the default arguments
@@ -237,10 +242,7 @@ class Parsley[T: IsDataclass]:
         if config_file_path is None and "config_file_name" in first_merged_args:
             config_file_path = first_merged_args["config_file_name"]
         if config_file_path is None:
-            try:
-                self.args_config_file = asdict(self.args_dataclass_name())
-            except TypeError as exc:
-                raise ArgsDataclassDefaultsError(self.args_dataclass_name) from exc
+            self.args_config_file = {}
         else:
             self.parse_config_file_arguments(config_file_path)
         assert self.args_config_file is not None
@@ -254,31 +256,14 @@ class Parsley[T: IsDataclass]:
 
         parsley_logger.info("Merged args %s", pretty_repr(self.merged_args))
 
-        # Converting the args in the standardized dataclass
-        dataclass_args: T = dacite.from_dict(
-            data_class=self.args_dataclass_name,
-            data=self.merged_args,
-            config=dacite.Config(cast=[Enum]),
-        )
-
-        # passing one more time in the machine as we may still have some unresolved tags due to default values
-        new_dict = resolve_extended_dict_to_dict_allow_notfilled(
-            dicto=asdict(dataclass_args),
+        dataclass_args = resolve_dict_to_base_dataclass(
+            dicto=self.merged_args,
             base_cls=self.args_dataclass_name,
             raise_error_with_nones=False,
             package_name=self.package_name,
         )
-        new_dict = remove_notfilled_values(new_dict)
-        parsley_logger.info("Final Merged args %s", new_dict)
-
-        # Converting the args in the standardized dataclass
-        dataclass_args_final: T = dacite.from_dict(
-            data_class=self.args_dataclass_name,
-            data=new_dict,
-            config=dacite.Config(cast=[Enum]),
-        )
-
-        return dataclass_args_final
+        parsley_logger.info("Final Merged args %s", asdict(dataclass_args))
+        return dataclass_args
 
     def parse_arguments(
         self,
