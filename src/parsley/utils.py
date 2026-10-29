@@ -446,6 +446,26 @@ def flatten_fields(cls: type[Any], prefix: str = "") -> dict[str, Field[Any]]:
     return flat_fields
 
 
+class InvalidBooleanValueError(argparse.ArgumentTypeError):
+    """Raised when a CLI boolean token is not recognized."""
+
+    def __init__(self, value: str) -> None:
+        """Describe the invalid token and the accepted boolean values."""
+        super().__init__(
+            f"expected true, false, 1, or 0 (case-insensitive), got {value!r}"
+        )
+
+
+def _parse_cli_bool(value: str) -> bool:
+    """Convert an explicit CLI boolean token without using string truthiness."""
+    token = value.lower()
+    if token in ("true", "1"):
+        return True
+    if token in ("false", "0"):
+        return False
+    raise InvalidBooleanValueError(value)
+
+
 # --- Add argparse arguments from flat fields ---
 def add_arguments_from_dataclass(
     parser: argparse.ArgumentParser, cls: type[Any]
@@ -453,9 +473,10 @@ def add_arguments_from_dataclass(
     """Add argparse options based on dataclass fields."""
     flat_fields = flatten_fields(cls)
     for name, f in flat_fields.items():
+        argument_type = resolve_type(f.type)
         parser.add_argument(
             f"--{name}",
-            type=resolve_type(f.type),
+            type=_parse_cli_bool if argument_type is bool else argument_type,
             default=None,
             help=(f.metadata.get("description", "to be written in dataclass metadata")),
         )
