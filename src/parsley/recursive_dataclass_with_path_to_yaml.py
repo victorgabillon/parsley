@@ -16,6 +16,7 @@ from parsley.alternative_dataclasses import (
     make_partial_dataclass_notfilled,
     make_partial_dataclass_with_optional_paths,
 )
+from parsley.errors import ConfigFileProcessingError
 from parsley.logger import get_parsley_logger
 from parsley.sentinels import is_notfilled, notfilled
 from parsley.utils import (
@@ -290,6 +291,8 @@ def resolve_yaml_file_to_dict_allow_notfilled[T: IsDataclass](
     try:
         with open(yaml_path_resolved, encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ConfigFileProcessingError(yaml_path, base_cls) from exc
     except OSError as exc:
         raise YamlFileReadError(yaml_path) from exc
 
@@ -340,6 +343,8 @@ def resolve_yaml_file_to_base_dataclass[T: IsDataclass](
     try:
         with open(yaml_path_resolved, encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
+    except yaml.YAMLError as exc:
+        raise ConfigFileProcessingError(yaml_path, base_cls) from exc
     except OSError as exc:
         parsley_logger.debug(
             "%s%s: Could not read file: %s", indent, level_of_recursion, yaml_path
@@ -515,6 +520,8 @@ def _try_resolve_direct_dataclass_value(
                 field.name,
                 dataclass_type,
             )
+        except ConfigFileProcessingError:
+            raise
         except Exception:  # pylint: disable=broad-exception-caught
             parsley_logger.debug(
                 "%s%s: Fail       %s dataclass %s",
@@ -567,6 +574,8 @@ def _try_resolve_yaml_provider_value(
             )
             _ = from_dict(data_class=dataclass_type, data=resolved_val_temp)
             resolved_val = resolved_val_temp
+        except ConfigFileProcessingError:
+            raise
         except Exception:  # pylint: disable=broad-exception-caught
             parsley_logger.debug("fail %s yaml %s %s", field.name, dataclass_type, val)
             continue
@@ -609,6 +618,8 @@ def _try_resolve_overwrite_value(
             overwrite_resolved_val = remove_notfilled_values(
                 overwrite_resolved_val_temp
             )
+        except ConfigFileProcessingError:
+            raise
         except Exception:  # pylint: disable=broad-exception-caught
             parsley_logger.debug(
                 "fail %s overwrite %s %s",

@@ -20,6 +20,7 @@ from rich.pretty import pretty_repr
 from parsley.alternative_dataclasses import (
     make_partial_dataclass_with_optional_paths,
 )
+from parsley.errors import ConfigFileProcessingError
 from parsley.logger import get_parsley_logger
 from parsley.recursive_dataclass_with_path_to_yaml import (
     resolve_extended_dict_to_dict_allow_notfilled,
@@ -34,17 +35,9 @@ from parsley.utils import (
     unflatten,
 )
 
+__all__ = ["ArgsDataclassDefaultsError", "ConfigFileProcessingError", "Parsley"]
+
 parsley_logger = get_parsley_logger()
-
-
-class ConfigFileProcessingError(ValueError):
-    """Raised when a config file cannot be processed for a dataclass."""
-
-    def __init__(self, config_file_path: str, dataclass_type: type[Any]) -> None:
-        """Initialize the error with the file path and dataclass type."""
-        super().__init__(
-            f"Could not process file {config_file_path} as {dataclass_type}."
-        )
 
 
 class ArgsDataclassDefaultsError(ValueError):
@@ -150,27 +143,19 @@ class Parsley[T: IsDataclass]:
             config_file_path (str): Path to the YAML file.
 
         """
-        args_config_file: dict[str, Any] = {}  # <--- initialize
-
         try:
             with open(config_file_path, encoding="utf-8"):
-                try:
-                    args_config_file = resolve_yaml_file_to_dict_allow_notfilled(
-                        yaml_path=config_file_path,
-                        base_cls=self.args_dataclass_name,
-                        raise_error_with_nones=False,
-                        package_name=self.package_name,
-                    )
-                    args_config_file = remove_notfilled_values(d=args_config_file)
-                    parsley_logger.info(
-                        "Here are the yaml file arguments of the script: %s",
-                        args_config_file,
-                    )
-                except yaml.YAMLError:
-                    parsley_logger.exception(
-                        "Failed to parse YAML file: %s", config_file_path
-                    )
-                    # args_config_file stays {} (or you can raise)
+                args_config_file = resolve_yaml_file_to_dict_allow_notfilled(
+                    yaml_path=config_file_path,
+                    base_cls=self.args_dataclass_name,
+                    raise_error_with_nones=False,
+                    package_name=self.package_name,
+                )
+                args_config_file = remove_notfilled_values(d=args_config_file)
+                parsley_logger.info(
+                    "Here are the yaml file arguments of the script: %s",
+                    args_config_file,
+                )
         except OSError as exc:
             raise ConfigFileProcessingError(
                 config_file_path, self.args_dataclass_name

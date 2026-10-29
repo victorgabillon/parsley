@@ -232,6 +232,12 @@ Always include a `discriminator` field (using `Literal[...]`) in each dataclass 
 
 ### Recursive YAML Parsing
 
+A requested YAML file with invalid syntax raises
+`parsley.parser.ConfigFileProcessingError`, including the offending file path
+and chaining the original `yaml.YAMLError` as `__cause__`. This also applies
+to nested YAML references and presets; malformed files never silently fall
+back to dataclass defaults. Omitting a configuration file still uses defaults.
+
 Parsley Coco supports recursive YAML parsing. For example:
 
 ```yaml
